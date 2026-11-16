@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="bg">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#f7f6f2">
+  <meta name="description" content="Личен офлайн седмичен отчет за кафене Aroma">
+  <title>Aroma — Седмичен отчет</title>
+  <link rel="manifest" href="./manifest.webmanifest">
+  <link rel="icon" type="image/svg+xml" href="./icon.svg">
+  <link rel="stylesheet" href="./styles.css">
+  <script src="./logic.js" defer></script>
+  <script src="./app.js" defer></script>
+</head>
+<body>
+  <div class="app-shell">
+    <header class="topbar">
+      <div class="brand"><span class="brand-mark">a.</span><div><strong>Aroma</strong><small>СЕДМИЧЕН ОТЧЕТ</small></div></div>
+      <span id="networkIndicator" class="network">Локални данни</span>
+    </header>
+
+    <main id="main" class="content">
+      <section id="view-week" class="view" aria-label="Седмица">
+        <div class="section-intro"><div><div class="eyebrow">ФИНАНСОВ ПРЕГЛЕД</div><h1>Седмицата</h1></div><button id="goToday" class="text-button" type="button">Тази седмица</button></div>
+        <div class="period-selector"><button id="prevWeek" aria-label="Предишна седмица" class="circle-button" type="button">‹</button><div class="period-center"><span id="weekPeriod" class="period-title"></span><span class="period-caption">Понеделник – неделя</span></div><button id="nextWeek" aria-label="Следваща седмица" class="circle-button" type="button">›</button></div>
+        <div class="week-top-cards"><div class="mini-stat"><span>Приходи</span><strong id="weekIncome">£0.00</strong></div><div class="mini-stat"><span>Разходи</span><strong id="weekExpenses">£0.00</strong></div></div>
+        <div class="result-card"><div><span>Резултат за седмицата</span><strong id="weekResult">£0.00</strong><small>Приходи минус разходи, включително месечния дял</small></div><span class="result-symbol">↗</span></div>
+        <div class="quick-actions"><button class="primary-button" type="button" data-action="add-income">＋ Приход</button><button class="secondary-button" type="button" data-action="add-expense">＋ Разход</button></div>
+        <div id="weekWarnings" class="message-slot" aria-live="polite"></div>
+        <details id="weekDetails" class="details-panel"><summary>Виж подробности <span class="summary-chevron">⌄</span></summary><div class="details-body"><div id="weeklyBreakdown"></div><h2 class="subheading">Дни от седмицата</h2><div id="weekDays"></div></div></details>
+        <div class="review-panel"><div id="reviewInfo"><strong>Проверка на седмицата</strong><p>Отбележи, когато си прегледал записите.</p></div><button id="reviewToggle" class="small-outline" type="button">Седмицата е проверена</button></div>
+      </section>
+
+      <section id="view-records" class="view" hidden aria-label="Записи">
+        <div class="section-intro"><div><div class="eyebrow">ВСЯКА ОПЕРАЦИЯ</div><h1>Записи</h1></div></div>
+        <p class="muted">Можеш да добавяш неограничен брой отделни приходи и разходи за всеки ден.</p>
+        <div class="period-selector compact"><button id="recordsPrev" class="circle-button" type="button" aria-label="Предишна седмица">‹</button><strong id="recordsWeekLabel"></strong><button id="recordsNext" class="circle-button" type="button" aria-label="Следваща седмица">›</button></div>
+        <div class="quick-actions"><button class="primary-button" type="button" data-action="add-income">＋ Приход</button><button class="secondary-button" type="button" data-action="add-expense">＋ Разход</button></div>
+        <div id="recordsList" class="record-list"></div>
+      </section>
+
+      <section id="view-bills" class="view" hidden aria-label="Месечни сметки">
+        <div class="section-intro"><div><div class="eyebrow">РАЗПРЕДЕЛЕНИ РАЗХОДИ</div><h1>Месечни сметки</h1></div></div>
+        <p class="muted">Наем, ток, вода, счетоводство, нетни заплати и HMRC се разпределят по календарни дни. Реалната сума заменя прогнозата, без удвояване.</p>
+        <div class="month-selector"><label for="billMonth">Разглеждан месец</label><input type="month" id="billMonth"></div>
+        <div class="section-row"><h2 class="subheading">Сметки за месеца</h2><button id="addBill" class="small-outline" type="button">＋ Добави сметка</button></div>
+        <div id="billsList" class="bill-list"></div>
+        <div class="hint-card"><strong>Плащане ≠ нов разход</strong><p>Когато платиш месечна сметка, можеш да го отбележиш отделно. Това не увеличава вече начисления разход. Например нетните заплати за октомври може да са платени на 5 ноември.</p></div>
+      </section>
+
+      <section id="view-reports" class="view" hidden aria-label="Отчети">
+        <div class="section-intro"><div><div class="eyebrow">СПРАВКИ</div><h1>Отчети</h1></div></div>
+        <h2 class="subheading">Седмичен отчет</h2>
+        <div id="reportWeek" class="report-card"></div>
+        <button id="weekCSV" class="secondary-button full" type="button">Изтегли седмичен CSV</button>
+        <div class="section-row report-month-title"><h2 class="subheading">Месечен отчет</h2><input id="reportMonth" type="month" aria-label="Месец на отчета"></div>
+        <div id="reportMonthSummary" class="report-card"></div>
+        <button id="monthCSV" class="secondary-button full" type="button">Изтегли месечен CSV</button>
+        <p class="hint-text">Седмицата остава цяла, дори да преминава между два месеца. Месечните отчети разпределят покупките и продажбите по действителната им дата.</p>
+      </section>
+
+      <section id="view-more" class="view" hidden aria-label="Още">
+        <div class="section-intro"><div><div class="eyebrow">НАСТРОЙКИ И ЗАЩИТА</div><h1>Още</h1></div></div>
+        <div class="settings-card"><h2 class="subheading">Картови плащания</h2><label for="cardFee">Ориентировъчна такса на POS терминала (%)</label><div class="inline-input"><input id="cardFee" type="text" inputmode="decimal" maxlength="5" value="1.69"><button id="saveFee" class="small-outline" type="button">Запази</button></div><p class="hint-text">Продажбата се записва в деня на Z отчета в пълния размер. Таксата се приспада като разход. Очакваното постъпление е на следващия календарен ден и не се брои като втори приход.</p></div>
+        <div class="settings-card"><h2 class="subheading">Архив и възстановяване</h2><p class="muted">Данните се пазят само в този браузър на телефона. GitHub не получава финансовите ти записи.</p><button id="backup" type="button" class="primary-button full">Изтегли пълен JSON архив</button><p id="lastBackup" class="hint-text"></p><label class="secondary-button full file-label" for="restoreFile">Възстанови от JSON архив</label><input id="restoreFile" type="file" accept="application/json,.json" hidden><p class="hint-text">Възстановяването замества текущите данни след потвърждение. Първо направи архив.</p></div>
+        <div class="settings-card"><h2 class="subheading">Инсталиране и офлайн</h2><button id="installApp" type="button" class="secondary-button full" hidden>Инсталирай приложението</button><p class="hint-text">Android Chrome → меню ⋮ → „Добавяне към началния екран“ или „Инсталиране“. След първото онлайн отваряне приложението може да работи офлайн.</p><span id="versionText" class="version">Aroma — версия 1.0.0</span></div>
+      </section>
+    </main>
+
+    <nav class="bottom-nav" aria-label="Основна навигация"><button type="button" class="nav-item active" data-view="week" aria-current="page"><span class="nav-icon">▦</span>Седмица</button><button type="button" class="nav-item" data-view="records"><span class="nav-icon">≡</span>Записи</button><button type="button" class="nav-item" data-view="bills"><span class="nav-icon">▤</span>Сметки</button><button type="button" class="nav-item" data-view="reports"><span class="nav-icon">▥</span>Отчети</button><button type="button" class="nav-item" data-view="more"><span class="nav-icon">⋯</span>Още</button></nav>
+  </div>
+
+  <dialog id="entryDialog" class="modal"><form id="entryForm" method="dialog" novalidate><div class="modal-heading"><h2 id="entryHeading">Нов запис</h2><button class="close-button" type="button" data-action="close-entry" aria-label="Затвори">×</button></div><input id="entryId" type="hidden"><input id="entryKind" type="hidden"><div class="form-field"><label for="entryDate">Дата</label><input id="entryDate" type="date" required></div><div class="form-field"><label for="entryAmount">Сума (£)</label><input id="entryAmount" type="text" inputmode="decimal" placeholder="Напр. 22.40" maxlength="15" required><small>Използвай отрицателна сума само за корекция/връщане.</small></div><div id="incomeFields" class="form-field"><label for="entryMethod">Начин на плащане</label><select id="entryMethod"><option value="cash">В брой (Cash)</option><option value="card">Карта (Card)</option><option value="other">Друг приход</option></select></div><div id="expenseFields" class="form-field" hidden><label for="entryCategory">Вид разход</label><select id="entryCategory"><option value="purchase">Покупки / стока</option><option value="other">Друг разход</option></select><small>За наем, ток, вода, заплати и HMRC използвай „Сметки“, за да няма двоен разход.</small></div><div id="paymentFields" hidden><div class="form-field"><label for="entryBill">Месечна сметка</label><select id="entryBill"></select></div><div class="form-field"><label for="entryForMonth">За кой месец се отнася</label><input id="entryForMonth" type="month"></div><p class="hint-text">Само отбелязване на плащането — не се включва повторно в разходите.</p></div><div class="form-field"><label for="entryNote">Бележка (незадължително)</label><textarea id="entryNote" rows="2" maxlength="500" placeholder="Напр. Z отчет, доставчик, корекция..."></textarea></div><div class="modal-actions"><button class="secondary-button" type="button" data-action="close-entry">Отказ</button><button class="primary-button" type="submit">Запази</button></div></form></dialog>
+
+  <dialog id="billDialog" class="modal"><form id="billForm" method="dialog" novalidate><div class="modal-heading"><h2 id="billHeading">Месечна сметка</h2><button type="button" class="close-button" data-action="close-bill" aria-label="Затвори">×</button></div><input id="billId" type="hidden"><div class="form-field"><label for="billTitle">Наименование</label><input id="billTitle" type="text" maxlength="100" required placeholder="Напр. Наем"><div class="suggestions" id="billSuggestions"><button type="button" data-suggest="Наем">Наем</button><button type="button" data-suggest="Ток">Ток</button><button type="button" data-suggest="Вода">Вода</button><button type="button" data-suggest="Счетоводство">Счетоводство</button><button type="button" data-suggest="Нетни заплати">Нетни заплати</button><button type="button" data-suggest="HMRC / PAYE / NI">HMRC</button></div></div><div class="form-field"><label for="billEstimate">Месечна прогнозна сума (£)</label><input id="billEstimate" type="text" inputmode="decimal" maxlength="15" required placeholder="Напр. 950.00"></div><div class="form-field"><label for="billStart">В сила от месец</label><input id="billStart" type="month" required></div><p class="hint-text">Промяна на прогнозата влияе на месеците без зададена реална сума от началния месец нататък.</p><div class="modal-actions"><button type="button" class="secondary-button" data-action="close-bill">Отказ</button><button type="submit" class="primary-button">Запази</button></div></form></dialog>
+
+  <dialog id="actualDialog" class="modal"><form id="actualForm" method="dialog" novalidate><div class="modal-heading"><h2 id="actualHeading">Реална сума</h2><button type="button" class="close-button" data-action="close-actual" aria-label="Затвори">×</button></div><input id="actualBillId" type="hidden"><p id="actualMonthLabel" class="muted"></p><div class="form-field"><label for="actualAmount">Реално начислена сума (£)</label><input id="actualAmount" type="text" inputmode="decimal" maxlength="15" required></div><div class="modal-actions"><button id="clearActual" type="button" class="quiet-button">Махни реалната сума</button><button type="submit" class="primary-button">Запази</button></div></form></dialog>
+  <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
+  <noscript><p>За да работи приложението, включи JavaScript в браузъра.</p></noscript>
+</body>
+</html>
