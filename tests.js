@@ -55,7 +55,7 @@ assert(app.includes('data-action="day-income"'));
 assert(app.includes('data-action="day-expense"'));
 assert(app.includes('data-action="day-records"'));
 assert(app.includes("const KEY = 'aroma.weekly.v1'"));
-assert(sw.includes("const CACHE = 'aroma-weekly-v1.11.0'"));
+assert(sw.includes("const CACHE = 'aroma-weekly-v1.12.0'"));
 assert(html.includes('id="turnoverDialog"'));
 assert(app.includes('data-action="day-turnover"'));
 assert(html.includes('id="weekTurnover"'));
@@ -136,7 +136,7 @@ const reversed = JSON.stringify(C.cardSettlementSchedule(bank,C.weekDates('2026-
 assert.equal(JSON.stringify(C.cardSettlementSchedule(bank,C.weekDates('2026-11-16'))),reversed,'Deterministic settlement plan');
 assert(html.includes('id="settlementWeek"'));
 assert(html.includes('id="settlementMonth"'));
-assert(html.includes('Aroma — версия 1.11.0'));
+assert(html.includes('Aroma — версия 1.12.0'));
 assert(app.includes('C.cardSettlementDate(day.date)'));
 assert(app.includes('C.cardSettlementSchedule(data, dates)'));
 console.log('✓ v1.3.0 card settlement checks passed: weekday rules, Friday–Sunday Monday merge, cross-week/month, charges and UI wiring.');
@@ -223,40 +223,40 @@ assert(app.includes('price-tie-note'), 'Equal prices explicitly identified');
 assert(app.includes("$('priceSearch').addEventListener('input', renderPriceTool)"));
 const same=[{quantity:12,unit:'pc',totalPence:400},{quantity:18,unit:'pc',totalPence:600},{quantity:24,unit:'pc',totalPence:800}];
 assert(same.every(x=>Math.abs(C.priceRate(x)-C.priceRate(same[0]))<1e-7));
-assert(html.includes('app.js?v=1.11.0'), 'HTML versioned to reduce stale code after update');
+assert(html.includes('app.js?v=1.12.0'), 'HTML versioned to reduce stale code after update');
 console.log('✓ v1.7.0: price search, save confirmation, equal prices and cache-busting links.');
 
-// v1.11.0: optional in-progress offer is independent of real financial records.
+// v1.12.0: optional in-progress offer is independent of real financial records.
 assert(app.includes("const PRICE_DRAFT_KEY = 'aroma.price-draft.v1'"));
 assert(app.includes('function persistPriceDraft()'));
 assert(app.includes('function restorePriceDraft()'));
 assert(app.includes('function clearPriceDraftFromStorage()'));
 assert(html.includes('id="priceDraftInfo"'));
 assert(app.includes('restorePriceDraft(); registerListeners(); renderAll();'));
-console.log('✓ v1.11.0: draft safety and unchanged financial storage key.');
+console.log('✓ v1.12.0: draft safety and unchanged financial storage key.');
 
-// v1.11.0: guard a Z-report date change, keep the backup reminder in More,
+// v1.12.0: guard a Z-report date change, keep the backup reminder in More,
 // and avoid mutating financial data before validation.
 assert(app.includes('function changeTurnoverDate()'));
 assert(app.includes('Има незаписани Cash/Card суми'));
 assert(app.includes("$('turnoverDate').addEventListener('change', changeTurnoverDate)"));
 assert(app.includes('Препоръчително е да направиш нов JSON архив.'));
 assert(app.includes('const candidate = structuredClone(data)'));
-console.log('✓ v1.11.0: safeguards for editing, backup reminder and transactional validation.');
+console.log('✓ v1.12.0: safeguards for editing, backup reminder and transactional validation.');
 
-// v1.11.0: the offline cache must contain the *exact* versioned URLs
+// v1.12.0: the offline cache must contain the *exact* versioned URLs
 // referenced by the HTML, not just the unversioned filenames.
 const serviceWorker = fs.readFileSync(__dirname + '/sw.js', 'utf8');
 for (const resource of ['styles.css','logic.js','app.js']) {
-  assert(html.includes(`./${resource}?v=1.11.0`));
-  assert(serviceWorker.includes(`./${resource}?v=1.11.0`), `Offline cache missing ${resource}`);
+  assert(html.includes(`./${resource}?v=1.12.0`));
+  assert(serviceWorker.includes(`./${resource}?v=1.12.0`), `Offline cache missing ${resource}`);
 }
 assert(serviceWorker.includes("const shouldCache = isPage || CACHEABLE.has(url.href)"), 'Only static assets are cacheable');
 assert(app.includes('включително офертите'), 'Archive restoration must warn that offers are replaced');
 assert(app.includes("navigator.serviceWorker.register('./sw.js', { updateViaCache: 'none' })"));
-console.log('✓ v1.11.0 offline assets and archive overwrite warnings verified.');
+console.log('✓ v1.12.0 offline assets and archive overwrite warnings verified.');
 
-// v1.11.0: purchase allocation changes ONLY weekly daily PRESENTATION.
+// v1.12.0: purchase allocation changes ONLY weekly daily PRESENTATION.
 // The original records, true dates and month reports must stay unchanged.
 {
   const local = C.emptyData();
@@ -272,9 +272,9 @@ console.log('✓ v1.11.0 offline assets and archive overwrite warnings verified.
   assert.equal(spread.days[0].purchases,0,'Monday has no allocated purchases');
   assert.deepEqual(spread.days.slice(1).map(d=>d.purchases),[7784,7784,7784,7784,7783,7783]);
   assert.equal(spread.days.reduce((s,d)=>s+d.purchases,0),46702);
-  assert.equal(spread.days[0].expenses,13700,'Monday has only calendar-day bills, not purchases');
-  assert.equal(spread.days[1].expenses,13700+Math.round(5550*169/10000)+7784);
-  assert.equal(spread.days[2].expenses,13700+7784);
+  assert.equal(spread.days[0].expenses,0,'Monday has no allocated purchases or monthly bills');
+  assert.equal(spread.days[1].expenses,15984+Math.round(5550*169/10000)+7784);
+  assert.equal(spread.days[2].expenses,15984+7784);
   assert.equal(spread.expenses,raw.expenses,'No change in weekly total expenses');
   assert.equal(spread.result,raw.result,'No change in weekly profit');
   assert.equal(spread.days.reduce((s,d)=>s+d.expenses,0),spread.expenses,'Daily expenses must add to weekly expenses');
@@ -296,6 +296,45 @@ console.log('✓ v1.11.0 offline assets and archive overwrite warnings verified.
   assert(empty.days.every(d=>d.purchases===0));
   assert(app.includes('C.weekDisplaySummary(data, selectedWeek)'), 'Weekly screen and weekly reports must use new display');
   assert(app.includes("monthly ? C.periodSummary(data, dates) : C.weekDisplaySummary(data, selectedWeek)"), 'CSV week/month views distinct');
-  assert(html.includes('В седмичния изглед покупките са разпределени между вторник и неделя.'));
-  console.log('✓ v1.11.0: 22 checks for weekly split, pennies, negatives, cross-month dates, original records and CSV labels.');
+  assert(html.includes('В седмичния дневен изглед покупките и месечните сметки се разпределят между вторник и неделя;'));
+  // v1.12.0: bill accruals also move only in the WEEKLY daily presentation.
+  assert.equal(raw.monthly,95900,'Seven calendar-day bill shares stay £959.00');
+  assert.equal(spread.monthly,raw.monthly,'Weekly bill total must be preserved');
+  assert.deepEqual(spread.days.map(d=>d.monthly),[0,15984,15984,15983,15983,15983,15983]);
+  assert.deepEqual(spread.days.map(d=>d.purchases),[0,7784,7784,7784,7784,7783,7783]);
+  assert.equal(spread.days.reduce((sum,d)=>sum+d.monthly,0),raw.monthly);
+  assert.equal(C.dateSummary(local,'2026-11-16').monthly,13700,'Original Monday calendar accrual unaffected');
+  assert.equal(C.periodSummary(local,C.monthDates('2026-11')).monthly,411000,'Full monthly bill still £4,110.00');
+  assert.equal(C.weekDisplaySummary(local,'2026-11-16').days[0].monthly,0);
+  assert.equal(C.weekDisplaySummary(local,'2026-11-16').days[0].purchases,0);
+  assert.equal(local.bills[0].estimatePence,411000,'Bill record must be unchanged');
+  // Week straddles Jan-Feb, both monthly accruals remain in the real months.
+  partial.bills.push({id:'jan_feb_rent',title:'Сметка',startMonth:'2023-01',estimatePence:3100,actuals:{'2023-02':2800}});
+  const beforeCross = C.periodSummary(partial,C.weekDates('2023-01-30'));
+  const crossBills = C.weekDisplaySummary(partial,'2023-02-05');
+  assert.equal(beforeCross.monthly,700,'Two days × £1 Jan + five days × £1 Feb');
+  assert.deepEqual(crossBills.days.map(d=>d.monthly),[0,117,117,117,117,116,116]);
+  assert.equal(crossBills.monthly,700);
+  assert.equal(crossBills.expenses,beforeCross.expenses);
+  assert.equal(crossBills.result,beforeCross.result);
+  assert.equal(C.periodSummary(partial,C.monthDates('2023-01')).monthly,3100);
+  assert.equal(C.periodSummary(partial,C.monthDates('2023-02')).monthly,2800);
+  assert.equal(C.dateSummary(partial,'2023-01-30').monthly,100);
+  assert.equal(C.dateSummary(partial,'2023-02-05').monthly,100);
+  assert(C.validState(partial),'Old backup schema unchanged');
+  // Other actual expenses on Monday remain on their true date.
+  const mondayOther = C.emptyData();
+  mondayOther.records.push({id:'repair',date:'2026-11-16',kind:'expense',category:'other',amountPence:450,note:'Ремонт'});
+  mondayOther.bills.push({id:'rent',title:'Наем',startMonth:'2026-11',estimatePence:3000,actuals:{}});
+  const mondayDisplay=C.weekDisplaySummary(mondayOther,'2026-11-16').days[0];
+  assert.equal(mondayDisplay.purchases,0);
+  assert.equal(mondayDisplay.monthly,0);
+  assert.equal(mondayDisplay.expenses,450,'Real miscellaneous expense remains on Monday');
+  assert.equal(C.weekDisplaySummary(mondayOther,'2026-11-16').monthly,
+    C.periodSummary(mondayOther,C.weekDates('2026-11-16')).monthly);
+  assert(app.includes('Месечни разходи (разпределени Вт–Нд)'));
+  assert(app.includes('Месечни разходи (по календарни дни)'));
+  assert(app.includes('Понеделник е с £0.00 разпределени покупки и сметки.'));
+  console.log('✓ v1.12.0: Tue–Sun bill & purchase distribution, exact pence, real dates, cross-month periods, preserved totals, no Monday bill share.');
+  console.log('✓ v1.12.0: 22 checks for weekly split, pennies, negatives, cross-month dates, original records and CSV labels.');
 }

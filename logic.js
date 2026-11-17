@@ -1,4 +1,4 @@
-/* Aroma — Седмичен отчет v1.11.0: pure date, accounting and price comparison functions. */
+/* Aroma — Седмичен отчет v1.12.0: pure date, accounting and price comparison functions. */
 (function (root, factory) {
   const api = factory();
   if (typeof module === 'object' && module.exports) module.exports = api;
@@ -94,22 +94,29 @@
     const totals = Object.fromEntries(keys.map(k => [k, days.reduce((sum, d) => sum + d[k], 0)]));
     return { ...totals, days, missing: days.filter(d => d.state === 'missing').length };
   }
-  // v1.11.0: For the weekly DAY DISPLAY only, share all purchases dated Mon–Sun
-  // across Tue–Sun. Do not move or edit real records. Monthly reports use the
-  // original dates. Whole pennies are assigned deterministically so totals match.
+  // v1.12.0: In the WEEKLY DAY DISPLAY only, share the week's purchases and
+  // calendar-day monthly-bill accruals across Tue–Sun, leaving Monday's allocated
+  // share at zero. The original records and monthly accounting stay untouched.
+  // Deterministic integer pennies keep the complete week total exactly unchanged.
+  function sixDayShare(amount, dayIndex) {
+    if (dayIndex === 0) return 0;
+    const absolute = Math.abs(amount);
+    const perDay = Math.floor(absolute / 6);
+    const remaining = absolute % 6;
+    return Math.sign(amount) * (perDay + (dayIndex <= remaining ? 1 : 0));
+  }
   function weekDisplaySummary(data, date) {
     const raw = periodSummary(data, weekDates(date));
-    const absolute = Math.abs(raw.purchases);
-    const unit = Math.floor(absolute / 6);
-    const extra = absolute % 6;
-    const sign = raw.purchases < 0 ? -1 : 1;
     const days = raw.days.map((day, index) => {
-      const purchases = index === 0 ? 0 : sign * (unit + (index - 1 < extra ? 1 : 0));
-      const expenses = day.expenses - day.purchases + purchases;
+      const purchases = sixDayShare(raw.purchases, index);
+      const monthly = sixDayShare(raw.monthly, index);
+      const expenses = day.expenses - day.purchases - day.monthly + purchases + monthly;
       return {
         ...day,
-        originalPurchases: day.purchases, // informational: purchases on their real date
-        purchases, // allocated share shown in the WEEK's daily row and weekly CSV
+        originalPurchases: day.purchases,
+        originalMonthly: day.monthly,
+        purchases, // weekly allocation, not the purchase date
+        monthly, // weekly allocation, not the bill's daily calendar accrual
         expenses,
         result: day.income - expenses
       };

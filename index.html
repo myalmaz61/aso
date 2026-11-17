@@ -8,9 +8,9 @@
   <title>Aroma — Седмичен отчет</title>
   <link rel="manifest" href="./manifest.webmanifest">
   <link rel="icon" type="image/svg+xml" href="./icon.svg">
-  <link rel="stylesheet" href="./styles.css?v=1.11.0">
-  <script src="./logic.js?v=1.11.0" defer></script>
-  <script src="./app.js?v=1.11.0" defer></script>
+  <link rel="stylesheet" href="./styles.css?v=1.12.0">
+  <script src="./logic.js?v=1.12.0" defer></script>
+  <script src="./app.js?v=1.12.0" defer></script>
 </head>
 <body>
   <div class="app-shell">
@@ -60,7 +60,7 @@
         <div id="reportMonthSummary" class="report-card"></div>
         <button id="monthCSV" class="secondary-button full" type="button">Изтегли месечен CSV</button>
         <details class="settlement-panel"><summary>Банкови постъпления за месеца · Card <span aria-hidden="true">⌄</span></summary><div class="settlement-content"><p class="hint-text">Картови преводи с очаквана дата в избрания месец — възможно е продажбите да са от предходен месец.</p><div id="settlementMonth"></div></div></details>
-        <p class="hint-text">Седмицата остава цяла, дори да преминава между два месеца. В седмичния изглед покупките са разпределени между вторник и неделя. Месечните отчети отчитат покупките и продажбите по действителната им дата.</p>
+        <p class="hint-text">Седмицата остава цяла, дори да преминава между два месеца. В седмичния дневен изглед покупките и месечните сметки се разпределят между вторник и неделя; понеделник няма дял от тях. Реалните покупки остават на датата си, а месечните отчети запазват календарното начисляване на сметките.</p>
       </section>
 
       <section id="view-more" class="view" hidden aria-label="Още">
@@ -94,7 +94,7 @@
         </details>
         <div class="settings-card"><h2 class="subheading">Картови плащания</h2><label for="cardFee">Ориентировъчна такса на POS терминала (%)</label><div class="inline-input"><input id="cardFee" type="text" inputmode="decimal" maxlength="5" value="1.69"><button id="saveFee" class="small-outline" type="button">Запази</button></div><p class="hint-text">Продажбата се записва в деня на Z отчета в пълния размер. Таксата се приспада като разход. Очакваните банкови постъпления са: продажби от понеделник–четвъртък на следващия ден; продажби от петък, събота и неделя — в понеделник. Не са втори приход. Посочените дати са ориентировъчни; празници и платежният оператор могат да ги променят.</p></div>
         <div class="settings-card"><h2 class="subheading">Архив и възстановяване</h2><p class="muted">Данните се пазят само в този браузър на телефона. GitHub не получава финансовите ти записи.</p><button id="backup" type="button" class="primary-button full">Изтегли пълен JSON архив</button><p id="lastBackup" class="hint-text"></p><label class="secondary-button full file-label" for="restoreFile">Възстанови от JSON архив</label><input id="restoreFile" type="file" accept="application/json,.json" hidden><p class="hint-text">Възстановяването замества текущите данни след потвърждение. Първо направи архив.</p></div>
-        <div class="settings-card"><h2 class="subheading">Инсталиране и офлайн</h2><button id="installApp" type="button" class="secondary-button full" hidden>Инсталирай приложението</button><p class="hint-text">Android Chrome → меню ⋮ → „Добавяне към началния екран“ или „Инсталиране“. След първото онлайн отваряне приложението може да работи офлайн.</p><span id="versionText" class="version">Aroma — версия 1.11.0</span></div>
+        <div class="settings-card"><h2 class="subheading">Инсталиране и офлайн</h2><button id="installApp" type="button" class="secondary-button full" hidden>Инсталирай приложението</button><p class="hint-text">Android Chrome → меню ⋮ → „Добавяне към началния екран“ или „Инсталиране“. След първото онлайн отваряне приложението може да работи офлайн.</p><span id="versionText" class="version">Aroma — версия 1.12.0</span></div>
       </section>
     </main>
 

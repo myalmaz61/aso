@@ -1,4 +1,4 @@
-/* Aroma — Седмичен отчет v1.11.0. All bookkeeping data stays in this browser. */
+/* Aroma — Седмичен отчет v1.12.0. All bookkeeping data stays in this browser. */
 (() => {
   'use strict';
   const C = window.AromaCore;
@@ -140,7 +140,7 @@
       '<div class="rule"></div>',
       amountRow('Отбелязани плащания по сметки (не са втори разход)', s.payments, 'muted-amount')
     ].join('');
-    $('weeklyBreakdown').insertAdjacentHTML('beforeend', '<p class="hint-text">Покупките от понеделник до неделя са разпределени по равно върху шестте дни вторник–неделя. Оригиналната дата на всяка покупка остава в „Записи“ и в месечния отчет.</p>');
+    $('weeklyBreakdown').insertAdjacentHTML('beforeend', '<p class="hint-text">Покупките и месечните сметки се разпределят за седмичния дневен изглед само между вторник и неделя. Понеделник е с £0.00 разпределени покупки и сметки. Реалните дати и месечните отчети не се променят.</p>');
     $('weekDays').innerHTML = s.days.map(day => {
       const status = day.state === 'closed' ? 'Затворено' : day.state === 'zero' ? 'Без оборот · £0' : day.state === 'recorded' ? 'Въведено' : 'Няма данни';
       const kind = day.state === 'missing' ? 'missing' : day.state === 'closed' ? 'closed' : 'done';
@@ -720,7 +720,7 @@
   function exportCSV(monthly) {
     const dates = monthly ? C.monthDates(reportMonth) : C.weekDates(selectedWeek);
     const s = monthly ? C.periodSummary(data, dates) : C.weekDisplaySummary(data, selectedWeek);
-    const header = ['Дата','Статус','Брой','Карта','Друг приход','Всички приходи', monthly ? 'Покупки (действителна дата)' : 'Покупки (разпределени Вт–Нд)','Други разходи','Такса карта','Месечни разходи (дял)','Всички разходи','Резултат','Платени месечни сметки (информация)'];
+    const header = ['Дата','Статус','Брой','Карта','Друг приход','Всички приходи', monthly ? 'Покупки (действителна дата)' : 'Покупки (разпределени Вт–Нд)','Други разходи','Такса карта',monthly ? 'Месечни разходи (по календарни дни)' : 'Месечни разходи (разпределени Вт–Нд)','Всички разходи','Резултат','Платени месечни сметки (информация)'];
     const statusBg = { closed: 'Затворено', zero: 'Без оборот', recorded: 'Въведено', missing: 'Няма данни' };
     const amounts = d => ['cash','card','otherIncome','income','purchases','otherExpense','cardFee','monthly','expenses','result','payments'].map(k => textMoney(d[k]));
     const rows = [header, ...s.days.map(d => [d.date, statusBg[d.state], ...amounts(d)]), ['ОБЩО', '', ...amounts(s)]];
