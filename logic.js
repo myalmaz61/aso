@@ -1,4 +1,4 @@
-/* Aroma — Седмичен отчет v1.2.0: pure date and accounting functions. */
+/* Aroma — Седмичен отчет v1.3.0: pure date and accounting functions. */
 (function (root, factory) {
   const api = factory();
   if (typeof module === 'object' && module.exports) module.exports = api;
@@ -35,6 +35,12 @@
     return Array.from({ length: n }, (_, i) => `${month}-${String(i + 1).padStart(2, '0')}`);
   }
   function monthOf(date) { return date.slice(0, 7); }
+  // Expected settlement rule supplied by Aroma: Mon–Thu sales settle next day;
+  // Friday, Saturday and Sunday sales settle on Monday. Not bank confirmation.
+  function cardSettlementDate(saleDate) {
+    const dow = dayOfWeek(saleDate);
+    return addDays(saleDate, dow === 5 ? 3 : dow === 6 ? 2 : 1);
+  }
   function money(pence) { return new Intl.NumberFormat('en-GB', { style: 'currency', currency: 'GBP' }).format(pence / 100); }
   function parseMoney(raw, allowNegative = false) {
     const v = String(raw).trim().replace(/\s/g, '').replace(',', '.');
@@ -87,6 +93,37 @@
     const keys = ['cash', 'card', 'otherIncome', 'income', 'purchases', 'otherExpense', 'cardFee', 'monthly', 'expenses', 'payments', 'result'];
     const totals = Object.fromEntries(keys.map(k => [k, days.reduce((sum, d) => sum + d[k], 0)]));
     return { ...totals, days, missing: days.filter(d => d.state === 'missing').length };
+  }
+  // Expected incoming bank transfers *by settlement date*. The selected reporting
+  // period can contain deposits from sales in a previous week/month. No records
+  // are created: sales and POS fees stay dated to the original Z report.
+  function cardSettlementSchedule(data, dates) {
+    if (!Array.isArray(dates) || !dates.length || dates.some(d => !validDate(d))) {
+      throw new Error('Избери валидни дати за банковите постъпления.');
+    }
+    const wanted = new Set(dates);
+    const byDate = new Map([...wanted].sort().map(date => [date, { date, sales: [], gross: 0, fee: 0, net: 0 }]));
+    const first = [...wanted].sort()[0];
+    const last = [...wanted].sort().at(-1);
+    for (let sale = addDays(first, -3); sale <= last; sale = addDays(sale, 1)) {
+      const payout = cardSettlementDate(sale);
+      if (!wanted.has(payout)) continue;
+      const summary = dateSummary(data, sale);
+      if (summary.card === 0) continue;
+      const row = byDate.get(payout);
+      const detail = { saleDate: sale, gross: summary.card, fee: summary.cardFee, net: summary.card - summary.cardFee };
+      row.sales.push(detail);
+      row.gross += detail.gross;
+      row.fee += detail.fee;
+      row.net += detail.net;
+    }
+    const days = [...byDate.values()].filter(row => row.sales.length);
+    return {
+      days,
+      gross: days.reduce((sum, day) => sum + day.gross, 0),
+      fee: days.reduce((sum, day) => sum + day.fee, 0),
+      net: days.reduce((sum, day) => sum + day.net, 0)
+    };
   }
   function fingerprint(data, week) {
     const dates = weekDates(week), begin = dates[0], end = dates[6];
@@ -142,5 +179,5 @@
     if (new Set(data.records.map(r => r.id)).size !== data.records.length || new Set(data.bills.map(b => b.id)).size !== data.bills.length) return false;
     return true;
   }
-  return { validDate, validMonth, today, addDays, dayOfWeek, weekStart, weekDates, monthDates, monthOf, money, parseMoney, billAmount, billDailyShare, dateSummary, periodSummary, fingerprint, dailyZId, dailyZRecord, applyDailyTurnover, emptyData, validState };
+  return { validDate, validMonth, today, addDays, dayOfWeek, weekStart, weekDates, monthDates, monthOf, money, parseMoney, billAmount, billDailyShare, dateSummary, periodSummary, cardSettlementDate, cardSettlementSchedule, fingerprint, dailyZId, dailyZRecord, applyDailyTurnover, emptyData, validState };
 });

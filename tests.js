@@ -55,7 +55,7 @@ assert(app.includes('data-action="day-income"'));
 assert(app.includes('data-action="day-expense"'));
 assert(app.includes('data-action="day-records"'));
 assert(app.includes("const KEY = 'aroma.weekly.v1'"));
-assert(sw.includes("const CACHE = 'aroma-weekly-v1.2.0'"));
+assert(sw.includes("const CACHE = 'aroma-weekly-v1.3.0'"));
 assert(html.includes('id="turnoverDialog"'));
 assert(app.includes('data-action="day-turnover"'));
 assert(html.includes('id="weekTurnover"'));
@@ -88,3 +88,55 @@ const bad = structuredClone(z);
 bad.records.find(x=>x.id==='z_20230131_cash').date='2023-02-01';
 assert.throws(()=>C.applyDailyTurnover(bad,'2023-01-31',{cash:400}));
 console.log('✓ 15 daily Z tests passed: legacy safety, upsert, correction, zero, validation, no duplicate.');
+
+// v1.3.0: expected card transfers grouped by deposit day, not sale day.
+assert.equal(C.cardSettlementDate('2026-11-09'), '2026-11-10'); // Mon -> Tue
+assert.equal(C.cardSettlementDate('2026-11-10'), '2026-11-11'); // Tue -> Wed
+assert.equal(C.cardSettlementDate('2026-11-11'), '2026-11-12'); // Wed -> Thu
+assert.equal(C.cardSettlementDate('2026-11-12'), '2026-11-13'); // Thu -> Fri
+assert.equal(C.cardSettlementDate('2026-11-13'), '2026-11-16'); // Fri -> Mon
+assert.equal(C.cardSettlementDate('2026-11-14'), '2026-11-16'); // Sat -> Mon
+assert.equal(C.cardSettlementDate('2026-11-15'), '2026-11-16'); // Sun -> Mon
+assert.throws(()=>C.cardSettlementDate('2026-13-30'));
+const bank = C.emptyData();
+for (const [date,pence] of [
+  ['2026-11-13',10000],['2026-11-14',20000],['2026-11-15',30000],
+  ['2026-11-16',5000],['2026-11-17',6000]
+]) {
+  bank.records.push({id:'bank'+date.replaceAll('-',''),date,kind:'income',method:'card',amountPence:pence,note:''});
+}
+const untouched = JSON.stringify(bank);
+const current = C.cardSettlementSchedule(bank, C.weekDates('2026-11-16'));
+assert.equal(JSON.stringify(bank),untouched,'Settlement view must never mutate records');
+assert.equal(current.days[0].date,'2026-11-16');
+assert.deepEqual(current.days[0].sales.map(x=>x.saleDate),['2026-11-13','2026-11-14','2026-11-15']);
+assert.equal(current.days[0].gross,60000);
+assert.equal(current.days[0].fee,169+338+507);
+assert.equal(current.days[0].net,58986);
+assert.equal(current.days[1].date,'2026-11-17');
+assert.equal(current.days[1].gross,5000);
+assert.equal(current.days[1].net,4915);
+assert.equal(current.days[2].date,'2026-11-18');
+assert.equal(current.days[2].gross,6000);
+assert.equal(current.net,58986+4915+(6000-Math.round(6000*.0169)));
+// Bank transfers in current week may reflect revenue from the preceding week.
+assert.equal(C.periodSummary(bank,C.weekDates('2026-11-16')).card,11000);
+assert.equal(C.periodSummary(bank,C.weekDates('2026-11-09')).card,60000);
+const monthCrossing = C.emptyData();
+monthCrossing.records.push({id:'dec_last',date:'2026-12-31',kind:'income',method:'card',amountPence:12345,note:''});
+monthCrossing.records.push({id:'jan_first',date:'2027-01-01',kind:'income',method:'card',amountPence:10000,note:''});
+const januaryTransfers = C.cardSettlementSchedule(monthCrossing,C.monthDates('2027-01'));
+assert.equal(januaryTransfers.days[0].date,'2027-01-01'); // Thu Dec31 settles Fri Jan1
+assert.equal(januaryTransfers.days[0].sales[0].saleDate,'2026-12-31');
+assert.equal(januaryTransfers.days[1].date,'2027-01-04'); // Fri Jan1 settles Mon Jan4
+assert.equal(januaryTransfers.days[1].sales[0].saleDate,'2027-01-01');
+assert.equal(C.periodSummary(monthCrossing,C.monthDates('2027-01')).card,10000);
+assert.equal(C.cardSettlementSchedule(monthCrossing,C.weekDates('2027-02-08')).net,0,'Empty transfer week');
+const reversed = JSON.stringify(C.cardSettlementSchedule(bank,C.weekDates('2026-11-16')));
+assert.equal(JSON.stringify(C.cardSettlementSchedule(bank,C.weekDates('2026-11-16'))),reversed,'Deterministic settlement plan');
+assert(html.includes('id="settlementWeek"'));
+assert(html.includes('id="settlementMonth"'));
+assert(html.includes('Aroma — версия 1.3.0'));
+assert(app.includes('C.cardSettlementDate(day.date)'));
+assert(app.includes('C.cardSettlementSchedule(data, dates)'));
+console.log('✓ v1.3.0 card settlement checks passed: weekday rules, Friday–Sunday Monday merge, cross-week/month, charges and UI wiring.');

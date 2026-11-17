@@ -166,3 +166,20 @@ h2 { margin: 0; }
 .turnover-preview { font-size: 12px; line-height: 1.65; border: 1px solid #d6e5d9; border-radius: 10px; background: #ebf3ec; color: var(--primary); padding: 12px 14px; margin: 12px 0; }
 .turnover-preview.error { background: #fff2f0; color: var(--danger); border-color: #ead0cc; }
 @media (max-width: 350px) { .turnover-grid { grid-template-columns: 1fr; gap: 0; } }
+
+/* v1.3.0 — optional settlement forecast; no new controls on the main screen */
+.settlement-panel { margin: 14px 0 8px; border: 1px solid var(--border); border-radius: 15px; background: white; overflow: hidden; }
+.settlement-panel > summary { display: flex; justify-content: space-between; align-items: center; gap: 8px; cursor: pointer; padding: 15px 14px; color: var(--primary); font-weight: 730; font-size: 13px; list-style: none; }
+.settlement-panel > summary::-webkit-details-marker { display: none; }
+.settlement-panel > summary span { font-size: 17px; }
+.settlement-content { border-top: 1px solid var(--border); padding: 13px 14px 14px; }
+.settlement-content > .hint-text { margin: 0 0 14px; }
+.settlement-total { background: #edf4ef; border-radius: 12px; padding: 13px 15px; display: flex; flex-direction: column; gap: 4px; }
+.settlement-total span { font-size: 11px; color: #55746a; }
+.settlement-total strong { font-size: 23px; color: var(--primary); font-variant-numeric: tabular-nums; }
+.settlement-total small, .settlement-item small { font-size: 11px; line-height: 1.55; color: #75827b; }
+.settlement-item { padding: 14px 3px; border-bottom: 1px solid var(--border); display: flex; flex-direction: column; gap: 5px; }
+.settlement-item:last-child { border-bottom: 0; }
+.settlement-line { display: flex; align-items: baseline; justify-content: space-between; flex-wrap: wrap; gap: 9px; font-size: 12px; }
+.settlement-line strong:last-child { color: var(--primary); font-size: 15px; font-variant-numeric: tabular-nums; }
+.settlement-empty { font-size: 12px; line-height: 1.65; color: var(--muted); margin: 0; }

@@ -1,4 +1,4 @@
-/* Aroma — Седмичен отчет v1.2.0. All bookkeeping data stays in this browser. */
+/* Aroma — Седмичен отчет v1.3.0. All bookkeeping data stays in this browser. */
 (() => {
   'use strict';
   const C = window.AromaCore;
@@ -92,7 +92,7 @@
       const kind = day.state === 'missing' ? 'missing' : day.state === 'closed' ? 'closed' : 'done';
       const tags = data.days[day.date];
       const date = esc(day.date);
-      const note = day.card !== 0 ? `<small>Карта ${GBP(day.card)} · такса ~${GBP(day.cardFee)} · очаквано постъпление ${GBP(day.card - day.cardFee)} на ${shortDate(C.addDays(day.date, 1))}</small>` : '';
+      const note = day.card !== 0 ? `<small>Карта ${GBP(day.card)} · такса ~${GBP(day.cardFee)} · очакван превод ${GBP(day.card - day.cardFee)} на ${shortDate(C.cardSettlementDate(day.date))}</small>` : '';
       return `<article class="day-row"><div class="day-line"><div><strong>${esc(dayName(day.date))}</strong><small>${shortDate(day.date)} · <span class="status ${kind}">${status}</span></small></div><div class="day-money">${GBP(day.income)}<small>Разходи ${GBP(day.expenses)}</small></div></div>${note}<div class="day-quick-actions"><button type="button" data-action="day-turnover" data-date="${date}">Cash + Card</button><button type="button" data-action="day-income" data-date="${date}">＋ Приход</button><button type="button" data-action="day-expense" data-date="${date}">＋ Разход</button><button type="button" data-action="day-records" data-date="${date}">Записи</button></div><div class="day-actions"><button type="button" data-action="zero-day" data-date="${date}">Без оборот</button><button type="button" data-action="closed-day" data-date="${date}">Затворено</button>${tags ? `<button type="button" data-action="clear-day" data-date="${date}">Изчисти статуса</button>` : ''}</div></article>`;
     }).join('');
     const pastMissing = s.days.filter(d => d.date <= C.today() && d.state === 'missing').length;
@@ -130,10 +130,21 @@
   function reportHTML(s, title) {
     return `<strong class="report-period">${esc(title)}</strong><div class="report-main"><div><small>Приходи</small><strong>${GBP(s.income)}</strong></div><div><small>Разходи</small><strong>${GBP(s.expenses)}</strong></div></div><div class="report-result"><span>Резултат</span><strong class="${s.result < 0 ? 'negative' : ''}">${GBP(s.result)}</strong></div><details class="report-extra"><summary>Разбивка</summary>${amountRow('Брой (Cash)', s.cash)}${amountRow('Карта (Card)', s.card)}${amountRow('Друг приход', s.otherIncome)}${amountRow('Покупки', s.purchases)}${amountRow('Други разходи', s.otherExpense)}${amountRow('POS такси', s.cardFee)}${amountRow('Месечни начисления', s.monthly)}${amountRow('Отбелязани плащания (само информация)', s.payments)}</details>`;
   }
+  function settlementHTML(dates) {
+    const plan = C.cardSettlementSchedule(data, dates);
+    if (!plan.days.length) return '<p class="settlement-empty">Няма очаквани картови постъпления за този период според въведените продажби.</p>';
+    const rows = plan.days.map(day => {
+      const sources = day.sales.map(sale => `${shortDate(sale.saleDate)} (${GBP(sale.gross)})`).join(' · ');
+      return `<article class="settlement-item"><div class="settlement-line"><strong>${esc(dayName(day.date))}, ${shortDate(day.date)}</strong><strong>${GBP(day.net)}</strong></div><small>Продажби от: ${esc(sources)}</small><small>Бруто ${GBP(day.gross)} · прогнозна такса ${GBP(day.fee)}</small></article>`;
+    }).join('');
+    return `<div class="settlement-total"><span>Очаквано по банката за периода</span><strong>${GBP(plan.net)}</strong><small>Бруто ${GBP(plan.gross)} − такси ~${GBP(plan.fee)}</small></div>${rows}`;
+  }
   function renderReports() {
     const sw = C.periodSummary(data, C.weekDates(selectedWeek)), sm = C.periodSummary(data, C.monthDates(reportMonth));
     $('reportWeek').innerHTML = reportHTML(sw, weekTitle(selectedWeek));
     $('reportMonthSummary').innerHTML = reportHTML(sm, monthLabel(reportMonth));
+    $('settlementWeek').innerHTML = settlementHTML(C.weekDates(selectedWeek));
+    $('settlementMonth').innerHTML = settlementHTML(C.monthDates(reportMonth));
     $('reportMonth').value = reportMonth;
   }
   function renderMore() {
@@ -183,7 +194,7 @@
       const candidate = C.applyDailyTurnover(data, date, amounts);
       const s = C.dateSummary(candidate, date);
       $('turnoverPreview').classList.remove('error');
-      $('turnoverPreview').innerHTML = `<strong>Дневен сбор след записване</strong>Cash: ${GBP(s.cash)} · Card: ${GBP(s.card)}<br>Картова такса (прогноза): ${GBP(s.cardFee)}`;
+      $('turnoverPreview').innerHTML = `<strong>Дневен сбор след записване</strong>Cash: ${GBP(s.cash)} · Card: ${GBP(s.card)}<br>Картова такса (прогноза): ${GBP(s.cardFee)}${s.card !== 0 ? `<br>Очакван банков превод: ${GBP(s.card - s.cardFee)} на ${dateLabel(C.cardSettlementDate(date))}` : ''}`;
     } catch (error) {
       $('turnoverPreview').classList.add('error');
       $('turnoverPreview').textContent = error.message;
