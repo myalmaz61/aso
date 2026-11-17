@@ -217,3 +217,14 @@ h2 { margin: 0; }
 .price-offer-actions button { border: 0; padding: 6px 0; background: transparent; color: var(--primary); font-weight: 700; font-size: 12px; }
 .price-offer-actions button:last-child { color: var(--danger); }
 @media (max-width: 370px) { .price-field-grid { grid-template-columns: 1fr; gap: 0; } }
+
+/* v1.7.0 — explicit save feedback, filtered saved offers and equal-best offers. */
+.price-save-status { margin: 11px 0 0; padding: 10px 12px; border-radius: 10px; background: #edf6ee; color: #205a3f; font-size: 13px; line-height: 1.55; font-weight: 650; }
+.price-save-status.price-save-error { background: #fff0ed; color: #a2261a; }
+.price-save-status[hidden] { display: none !important; }
+.price-search-field { margin: 0 0 3px; }
+.price-search-field input { width: 100%; }
+.price-search-info { margin: 4px 0 10px; }
+.price-product-count { opacity: .74; }
+.price-tie-note { margin: 2px 0 11px; color: #34634f; font-size: 12px; line-height: 1.5; }
+.price-comparison h3:not(:first-child) { margin-top: 20px; }

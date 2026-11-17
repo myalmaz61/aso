@@ -1,4 +1,4 @@
-/* Aroma — Седмичен отчет v1.6.0. All bookkeeping data stays in this browser. */
+/* Aroma — Седмичен отчет v1.7.0. All bookkeeping data stays in this browser. */
 (() => {
   'use strict';
   const C = window.AromaCore;
@@ -196,15 +196,22 @@
     $('settlementMonth').innerHTML = settlementHTML(C.monthDates(reportMonth));
     $('reportMonth').value = reportMonth;
   }
-  // v1.6.0. Price offers are separate from the accounting records but part of
-  // the same protected JSON state/backup; old v1.5.0 state/backups remain valid.
+  // v1.7.0. The optional price tool never changes accounting records.
+  // The separate search operates on saved offers only, and marks ALL equal best prices.
   const priceOffers = () => data.priceOffers || [];
-  const priceMoney = pence => '£' + (pence / 100).toFixed(3);
+  const priceCurrency = new Intl.NumberFormat('en-GB', {style:'currency', currency:'GBP', minimumFractionDigits:2, maximumFractionDigits:4});
+  const priceMoney = pence => priceCurrency.format(pence / 100);
   const priceBaseLabel = group => group === 'count' ? 'брой' : group === 'volume' ? 'литър' : 'кг';
   function selectedPriceProduct() { return $('priceProduct').value.trim().replace(/\s+/g, ' '); }
+  function showPriceStatus(message, isError = false) {
+    const element = $('priceSaveStatus');
+    element.textContent = message;
+    element.hidden = !message;
+    element.classList.toggle('price-save-error', isError);
+  }
   function enteredPriceOffer() {
     const name = selectedPriceProduct();
-    if (!name || name.length > 80) throw new Error('Въведи име на продукт.');
+    if (!name || name.length > 80) throw new Error('Попълни име на продукт (например Fanta 330 мл).');
     const measure = C.priceMeasure($('priceQuantity').value, $('priceUnit').value);
     const totalPence = C.parseMoney($('priceTotal').value);
     if (totalPence <= 0) throw new Error('Цената трябва да е по-голяма от £0.');
@@ -212,7 +219,7 @@
       shop: $('priceShop').value.trim().replace(/\s+/g, ' '),
       quantity: measure.quantity, unit: measure.unit, totalPence,
       date: ($('priceOfferId').value && priceOffers().find(x => x.id === $('priceOfferId').value)?.date) || C.today() };
-    if (!C.validPriceOffer(offer)) throw new Error('Провери данните: продуктът или магазинът може да са твърде дълги.');
+    if (!C.validPriceOffer(offer)) throw new Error('Провери данните. Името на продукт или магазин може да е твърде дълго.');
     return offer;
   }
   function clearPriceEditor(keepProduct = true) {
@@ -226,12 +233,33 @@
     $('priceCancelEdit').hidden = true;
     renderPriceTool();
   }
+  function priceOfferComparison(product, group, collection) {
+    const sorted = collection.slice().sort((a,b) => C.priceRate(a) - C.priceRate(b) || a.date.localeCompare(b.date) || a.id.localeCompare(b.id));
+    const unitName = priceBaseLabel(group);
+    const bestRate = sorted.length ? C.priceRate(sorted[0]) : null;
+    const bestCount = sorted.filter(o => Math.abs(C.priceRate(o) - bestRate) < 1e-7).length;
+    let result = `<h3>${esc(product)} · цена за ${unitName}</h3>`;
+    if (bestCount > 1) result += `<p class="price-tie-note">${bestCount === sorted.length ? 'Всички оферти имат еднаква цена за единица.' : `${bestCount} оферти имат еднаква най-ниска цена за единица.`}</p>`;
+    result += sorted.map(o => {
+      const isBest = Math.abs(C.priceRate(o) - bestRate) < 1e-7;
+      const amountLabel = o.unit === 'pc' ? `${o.quantity} бр.` : `${o.quantity} ${o.unit}`;
+      return `<article class="price-offer ${isBest ? 'price-offer-best' : ''}"><div><strong>${priceMoney(C.priceRate(o))} / ${unitName}</strong>${isBest ? `<span class="price-best">${bestCount > 1 ? 'Също най-изгодно' : 'Най-изгодно'}</span>` : ''}<small>${esc(amountLabel)} · общо ${GBP(o.totalPence)}${o.shop ? ' · '+esc(o.shop) : ''} · ${shortDate(o.date)}</small></div><div class="price-offer-actions"><button type="button" data-action="price-edit" data-id="${esc(o.id)}">Редакция</button><button type="button" data-action="price-delete" data-id="${esc(o.id)}">Изтрий</button></div></article>`;
+    }).join('');
+    return result;
+  }
   function renderPriceTool() {
     const offers = priceOffers();
     const names = [...new Map(offers.map(o => [C.priceKey(o.product), o.product])).values()].sort((a,b) => a.localeCompare(b,'bg'));
     $('priceProductOptions').innerHTML = names.map(n => `<option value="${esc(n)}"></option>`).join('');
-    $('priceSavedCount').textContent = offers.length ? `${offers.length} оферти` : 'Няма оферти';
-    $('priceProducts').innerHTML = names.map(name => `<button type="button" class="price-product-button" data-action="price-select" data-product="${esc(name)}">${esc(name)}</button>`).join('') || '<span class="hint-text">Още няма запазени продукти.</span>';
+    $('priceSavedCount').textContent = `${offers.length} ${offers.length === 1 ? 'оферта' : 'оферти'}`;
+    const query = C.priceKey($('priceSearch').value);
+    const foundNames = query ? names.filter(name => C.priceKey(name).includes(query) || offers.some(o => C.priceKey(o.product) === C.priceKey(name) && C.priceKey(o.shop).includes(query))) : names;
+    $('priceProducts').innerHTML = foundNames.map(name => {
+      const count = offers.filter(o => C.priceKey(o.product) === C.priceKey(name)).length;
+      return `<button type="button" class="price-product-button" data-action="price-select" data-product="${esc(name)}">${esc(name)} <span class="price-product-count">(${count})</span></button>`;
+    }).join('') || `<span class="hint-text">${query ? 'Няма намерени продукти.' : 'Още няма запазени продукти.'}</span>`;
+    $('priceSearchInfo').textContent = query ? `Намерени: ${foundNames.length} ${foundNames.length === 1 ? 'продукт' : 'продукта'} · ${offers.filter(o => foundNames.some(n => C.priceKey(n) === C.priceKey(o.product))).length} оферти` : '';
+
     const product = selectedPriceProduct(), key = C.priceKey(product);
     const group = C.priceGroup($('priceUnit').value);
     const matches = offers.filter(o => C.priceKey(o.product) === key && C.priceGroup(o.unit) === group);
@@ -245,24 +273,25 @@
       const rate = C.priceRate(candidate), unitName = priceBaseLabel(group);
       const candidates = matches.filter(x => x.id !== $('priceOfferId').value);
       const best = candidates.length ? Math.min(...candidates.map(C.priceRate)) : null;
-      $('pricePreview').innerHTML = `<strong>${priceMoney(rate)} за ${unitName}</strong>${best !== null ? `<small>${rate < best - 1e-9 ? '✓ По-евтино от запазените оферти.' : Math.abs(rate-best)<1e-9 ? 'Същата единична цена като най-евтината оферта.' : 'Има по-евтина запазена оферта.'}</small>` : '<small>Натисни „Запази офертата“, ако искаш да я сравниш и друг ден.</small>'}`;
+      $('pricePreview').innerHTML = `<strong>${priceMoney(rate)} за ${unitName}</strong>${best !== null ? `<small>${rate < best - 1e-7 ? '✓ По-евтино от запазените оферти.' : Math.abs(rate-best)<1e-7 ? 'Същата единична цена като най-евтината оферта.' : 'Има по-евтина запазена оферта.'}</small>` : '<small>Натисни „Запази офертата“, за да я добавиш към сравнението.</small>'}`;
     } else if (!some) $('pricePreview').textContent = 'Въведи количество и цена, за да видиш цената за единица.';
+    else if (!product) $('pricePreview').textContent = 'Попълни име на продукт.';
     else if (!$('priceQuantity').value.trim() || !$('priceTotal').value.trim()) $('pricePreview').textContent = 'Попълни количество и обща цена.';
-    if (!product) {
-      $('priceComparison').innerHTML = '<p class="hint-text">Избери запазен продукт или напиши нов, за да видиш офертите.</p>';
+
+    if (query) {
+      if (!foundNames.length) { $('priceComparison').innerHTML = '<p class="hint-text">Няма намерени оферти. Опитай с друго име или магазин.</p>'; return; }
+      $('priceComparison').innerHTML = foundNames.map(name => {
+        const groups = ['count','volume','weight'].map(g => {
+          const groupOffers = offers.filter(o => C.priceKey(o.product) === C.priceKey(name) && C.priceGroup(o.unit) === g);
+          return groupOffers.length ? priceOfferComparison(name,g,groupOffers) : '';
+        });
+        return groups.join('');
+      }).join('');
       return;
     }
-    const sorted = matches.slice().sort((a,b) => C.priceRate(a) - C.priceRate(b) || a.date.localeCompare(b.date));
-    if (!sorted.length) {
-      $('priceComparison').innerHTML = `<p class="hint-text">Няма запазени сравнения за „${esc(product)}“ с тази мярка. Можеш да добавиш първата оферта.</p>`;
-      return;
-    }
-    const unitName = priceBaseLabel(group);
-    $('priceComparison').innerHTML = `<h3>Оферти за ${esc(product)} · за ${unitName}</h3>` + sorted.map((o,i) => {
-      const measureText = o.unit === 'pc' ? `${o.quantity} бр.` : `${o.quantity} ${o.unit}`;
-      const bestLabel = i === 0 ? '<span class="price-best">Най-изгодно</span>' : '';
-      return `<article class="price-offer ${i === 0 ? 'price-offer-best' : ''}"><div><strong>${priceMoney(C.priceRate(o))} / ${unitName}</strong>${bestLabel}<small>${esc(measureText)} · общо ${GBP(o.totalPence)}${o.shop ? ' · '+esc(o.shop) : ''} · ${shortDate(o.date)}</small></div><div class="price-offer-actions"><button type="button" data-action="price-edit" data-id="${esc(o.id)}">Редакция</button><button type="button" data-action="price-delete" data-id="${esc(o.id)}">Изтрий</button></div></article>`;
-    }).join('');
+    if (!product) { $('priceComparison').innerHTML = '<p class="hint-text">Избери запазен продукт или го потърси, за да видиш сравненията.</p>'; return; }
+    if (!matches.length) { $('priceComparison').innerHTML = `<p class="hint-text">Няма запазени сравнения за „${esc(product)}“ с тази мярка. Добави първата оферта.</p>`; return; }
+    $('priceComparison').innerHTML = priceOfferComparison(product, group, matches);
   }
   function savePriceOffer(event) {
     event.preventDefault();
@@ -272,18 +301,24 @@
       const index = offers.findIndex(o => o.id === offer.id);
       if (index >= 0) offers[index] = offer;
       else {
-        if (offers.length >= 3000) throw new Error('Достигнат е лимитът от 3000 сравнения.');
+        if (offers.length >= 3000) throw new Error('Достигнат е лимитът от 3000 запазени оферти.');
         offers.push(offer);
       }
       data = { ...data, priceOffers: offers };
-      if (commit('Офертата е запазена.')) {
+      if (commit()) {
         clearPriceEditor();
+        showPriceStatus(`✓ ${index >= 0 ? 'Поправката е запазена' : 'Офертата е запазена'}: ${offer.product}, ${offer.quantity} ${offer.unit === 'pc' ? 'бр.' : offer.unit} за ${GBP(offer.totalPence)}. Общо: ${offers.length} оферти.`);
+      } else {
+        showPriceStatus('Записът не беше успешен. Провери предупреждението и не изчиствай данните на Chrome.',true);
       }
-    } catch (error) { alertProblem('Неуспешно запазване на офертата: ' + error.message); }
+    } catch (error) {
+      showPriceStatus('Не е запазено: ' + error.message, true);
+    }
   }
   function editPriceOffer(id) {
     const offer = priceOffers().find(o => o.id === id);
     if (!offer) return;
+    $('priceSearch').value = '';
     $('priceOfferId').value = offer.id;
     $('priceProduct').value = offer.product;
     $('priceQuantity').value = String(offer.quantity);
@@ -292,6 +327,7 @@
     $('priceShop').value = offer.shop;
     $('priceSave').textContent = 'Запази поправката';
     $('priceCancelEdit').hidden = false;
+    showPriceStatus('');
     renderPriceTool();
     $('priceForm').scrollIntoView({block:'start', behavior:'smooth'});
   }
@@ -299,9 +335,13 @@
     const offer = priceOffers().find(o => o.id === id);
     if (!offer || !confirm(`Да изтрия ли офертата за „${offer.product}“ (${GBP(offer.totalPence)})?`)) return;
     data = { ...data, priceOffers: priceOffers().filter(o => o.id !== id) };
-    if (commit('Офертата е изтрита.') && $('priceOfferId').value === id) clearPriceEditor();
+    if (commit()) {
+      if ($('priceOfferId').value === id) clearPriceEditor();
+      showPriceStatus(`✓ Офертата е изтрита. Остават ${priceOffers().length} оферти.`);
+    } else showPriceStatus('Изтриването не беше успешно.',true);
   }
   function selectPriceProduct(name) {
+    $('priceSearch').value = '';
     $('priceProduct').value = name;
     const last = priceOffers().filter(o => C.priceKey(o.product) === C.priceKey(name)).at(-1);
     if (last) $('priceUnit').value = last.unit;
@@ -310,6 +350,7 @@
     $('priceCancelEdit').hidden = true;
     $('priceQuantity').value = '';
     $('priceTotal').value = '';
+    showPriceStatus('');
     renderPriceTool();
   }
   function renderMore() {
@@ -638,8 +679,12 @@
     $('billMonth').addEventListener('change', e => { if (C.validMonth(e.target.value)) { billMonth = e.target.value; renderBills(); } });
     $('reportMonth').addEventListener('change', e => { if (C.validMonth(e.target.value)) { reportMonth = e.target.value; renderReports(); } });
     $('priceForm').addEventListener('submit', savePriceOffer);
-    ['priceProduct','priceQuantity','priceUnit','priceTotal','priceShop'].forEach(id => $(id).addEventListener('input', renderPriceTool));
-    $('priceCancelEdit').addEventListener('click', () => clearPriceEditor());
+    ['priceProduct','priceQuantity','priceUnit','priceTotal','priceShop'].forEach(id => {
+      $(id).addEventListener('input', () => { showPriceStatus(''); renderPriceTool(); });
+      if (id === 'priceUnit') $(id).addEventListener('change', () => { showPriceStatus(''); renderPriceTool(); });
+    });
+    $('priceSearch').addEventListener('input', renderPriceTool);
+    $('priceCancelEdit').addEventListener('click', () => { clearPriceEditor(); showPriceStatus(''); });
     $('saveFee').addEventListener('click', saveFee);
     $('backup').addEventListener('click', backup);
     $('restoreFile').addEventListener('change', e => restore(e.target.files[0]));

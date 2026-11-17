@@ -1,4 +1,4 @@
-/* Aroma — Седмичен отчет v1.6.0: pure date, accounting and price comparison functions. */
+/* Aroma — Седмичен отчет v1.7.0: pure date, accounting and price comparison functions. */
 (function (root, factory) {
   const api = factory();
   if (typeof module === 'object' && module.exports) module.exports = api;
