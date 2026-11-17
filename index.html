@@ -65,9 +65,32 @@
 
       <section id="view-more" class="view" hidden aria-label="Още">
         <div class="section-intro"><div><div class="eyebrow">НАСТРОЙКИ И ЗАЩИТА</div><h1>Още</h1></div></div>
+        <details id="priceComparePanel" class="settings-card price-panel">
+          <summary>Сравнение на цени <span aria-hidden="true">⌄</span></summary>
+          <div class="price-panel-body">
+            <p class="hint-text">Сравнявай оферти от различни магазини по цена на бройка, литър или килограм. Тези оферти <strong>не се броят за покупки или разходи</strong>.</p>
+            <form id="priceForm" novalidate>
+              <input id="priceOfferId" type="hidden">
+              <div class="form-field"><label for="priceProduct">Продукт</label><input id="priceProduct" list="priceProductOptions" type="text" maxlength="80" autocomplete="off" placeholder="Напр. Fanta 330 мл или Кетчуп" required><datalist id="priceProductOptions"></datalist></div>
+              <div class="price-field-grid">
+                <div class="form-field"><label for="priceQuantity">Количество</label><input id="priceQuantity" type="text" inputmode="decimal" maxlength="16" placeholder="Напр. 8 или 750" required></div>
+                <div class="form-field"><label for="priceUnit">Мярка</label><select id="priceUnit"><option value="pc">брой</option><option value="ml">мл</option><option value="l">литър</option><option value="g">грама</option><option value="kg">кг</option></select></div>
+              </div>
+              <div class="price-field-grid">
+                <div class="form-field"><label for="priceTotal">Обща цена (£)</label><input id="priceTotal" type="text" inputmode="decimal" maxlength="15" placeholder="Напр. 3.00" required></div>
+                <div class="form-field"><label for="priceShop">Магазин (по желание)</label><input id="priceShop" type="text" maxlength="80" placeholder="Напр. Aldi"></div>
+              </div>
+              <div id="pricePreview" class="price-preview" aria-live="polite">Въведи количество и цена, за да видиш цената за единица.</div>
+              <div class="price-form-buttons"><button id="priceSave" class="primary-button" type="submit">Запази офертата</button><button id="priceCancelEdit" class="small-outline" type="button" hidden>Отказ от редакцията</button></div>
+            </form>
+            <div class="price-saved-heading"><strong>Запазени продукти</strong><span id="priceSavedCount"></span></div>
+            <div id="priceProducts" class="price-products"></div>
+            <div id="priceComparison" class="price-comparison" aria-live="polite"></div>
+          </div>
+        </details>
         <div class="settings-card"><h2 class="subheading">Картови плащания</h2><label for="cardFee">Ориентировъчна такса на POS терминала (%)</label><div class="inline-input"><input id="cardFee" type="text" inputmode="decimal" maxlength="5" value="1.69"><button id="saveFee" class="small-outline" type="button">Запази</button></div><p class="hint-text">Продажбата се записва в деня на Z отчета в пълния размер. Таксата се приспада като разход. Очакваните банкови постъпления са: продажби от понеделник–четвъртък на следващия ден; продажби от петък, събота и неделя — в понеделник. Не са втори приход. Посочените дати са ориентировъчни; празници и платежният оператор могат да ги променят.</p></div>
         <div class="settings-card"><h2 class="subheading">Архив и възстановяване</h2><p class="muted">Данните се пазят само в този браузър на телефона. GitHub не получава финансовите ти записи.</p><button id="backup" type="button" class="primary-button full">Изтегли пълен JSON архив</button><p id="lastBackup" class="hint-text"></p><label class="secondary-button full file-label" for="restoreFile">Възстанови от JSON архив</label><input id="restoreFile" type="file" accept="application/json,.json" hidden><p class="hint-text">Възстановяването замества текущите данни след потвърждение. Първо направи архив.</p></div>
-        <div class="settings-card"><h2 class="subheading">Инсталиране и офлайн</h2><button id="installApp" type="button" class="secondary-button full" hidden>Инсталирай приложението</button><p class="hint-text">Android Chrome → меню ⋮ → „Добавяне към началния екран“ или „Инсталиране“. След първото онлайн отваряне приложението може да работи офлайн.</p><span id="versionText" class="version">Aroma — версия 1.5.0</span></div>
+        <div class="settings-card"><h2 class="subheading">Инсталиране и офлайн</h2><button id="installApp" type="button" class="secondary-button full" hidden>Инсталирай приложението</button><p class="hint-text">Android Chrome → меню ⋮ → „Добавяне към началния екран“ или „Инсталиране“. След първото онлайн отваряне приложението може да работи офлайн.</p><span id="versionText" class="version">Aroma — версия 1.6.0</span></div>
       </section>
     </main>
 

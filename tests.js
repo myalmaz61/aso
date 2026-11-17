@@ -55,7 +55,7 @@ assert(app.includes('data-action="day-income"'));
 assert(app.includes('data-action="day-expense"'));
 assert(app.includes('data-action="day-records"'));
 assert(app.includes("const KEY = 'aroma.weekly.v1'"));
-assert(sw.includes("const CACHE = 'aroma-weekly-v1.5.0'"));
+assert(sw.includes("const CACHE = 'aroma-weekly-v1.6.0'"));
 assert(html.includes('id="turnoverDialog"'));
 assert(app.includes('data-action="day-turnover"'));
 assert(html.includes('id="weekTurnover"'));
@@ -136,7 +136,7 @@ const reversed = JSON.stringify(C.cardSettlementSchedule(bank,C.weekDates('2026-
 assert.equal(JSON.stringify(C.cardSettlementSchedule(bank,C.weekDates('2026-11-16'))),reversed,'Deterministic settlement plan');
 assert(html.includes('id="settlementWeek"'));
 assert(html.includes('id="settlementMonth"'));
-assert(html.includes('Aroma — версия 1.5.0'));
+assert(html.includes('Aroma — версия 1.6.0'));
 assert(app.includes('C.cardSettlementDate(day.date)'));
 assert(app.includes('C.cardSettlementSchedule(data, dates)'));
 console.log('✓ v1.3.0 card settlement checks passed: weekday rules, Friday–Sunday Monday merge, cross-week/month, charges and UI wiring.');
@@ -166,3 +166,50 @@ assert(app.includes('function storageIsCurrent()'));
 assert(app.includes("addEventListener('storage'"));
 assert(app.includes('lastSavedRaw = serialized'));
 console.log('✓ v1.5.0 safety checks: unsaved editors, tab conflict protection, unchanged primary buttons.');
+
+// v1.6.0: apples-to-apples comparisons by can, liter, kilogram; no purchase side effects.
+const fanta = [
+  {quantity:8,unit:'pc',totalPence:300},
+  {quantity:24,unit:'pc',totalPence:1200},
+  {quantity:12,unit:'pc',totalPence:800}
+];
+assert.equal(C.priceRate(fanta[0]), 37.5);
+assert.equal(C.priceRate(fanta[1]), 50);
+assert(Math.abs(C.priceRate(fanta[2])-66.66666666666)<0.001);
+assert.equal(fanta.map(C.priceRate).indexOf(Math.min(...fanta.map(C.priceRate))),0);
+const ketchup = [
+  {quantity:1,unit:'l',totalPence:400},
+  {quantity:4,unit:'l',totalPence:1500},
+  {quantity:750,unit:'ml',totalPence:280}
+];
+assert.equal(C.priceRate(ketchup[0]),400);
+assert.equal(C.priceRate(ketchup[1]),375);
+assert(Math.abs(C.priceRate(ketchup[2])-373.3333333333333)<0.001);
+assert.equal(ketchup.map(C.priceRate).indexOf(Math.min(...ketchup.map(C.priceRate))),2);
+assert.equal(C.priceRate({quantity:1.5,unit:'kg',totalPence:600}),400);
+assert.equal(C.priceRate({quantity:500,unit:'g',totalPence:250}),500);
+assert.equal(C.priceMeasure('1,5','l').baseQty,1500);
+assert.equal(C.priceMeasure('8','pc').group,'count');
+assert.throws(()=>C.priceMeasure('1.5','pc'));
+assert.throws(()=>C.priceMeasure('0','ml'));
+assert.throws(()=>C.priceMeasure('-2','l'));
+assert.equal(C.priceGroup('ml'),C.priceGroup('l'));
+assert.notEqual(C.priceGroup('pc'),C.priceGroup('ml'));
+assert.equal(C.priceKey(' FANTA   330 мл '),C.priceKey('fanta 330 мл'));
+const offer={id:'offer_1',product:'Кетчуп',shop:'Aldi',quantity:750,unit:'ml',totalPence:280,date:'2026-11-17'};
+assert(C.validPriceOffer(offer));
+assert(!C.validPriceOffer({...offer,quantity:0}));
+assert(!C.validPriceOffer({...offer,unit:'litres'}));
+assert(C.validState({...d,priceOffers:[offer]}));
+assert(C.validState({...d,priceOffers:undefined}),'Old backups without priceOffers must work');
+assert(!C.validState({...d,priceOffers:[offer,offer]}),'Duplicate IDs must be rejected');
+assert(!C.validState({...d,priceOffers:[{...offer,totalPence:0}]}));
+const beforeCompare=C.periodSummary(d,C.weekDates('2023-02-01'));
+const withOffers={...d,priceOffers:[offer]};
+assert.deepEqual(C.periodSummary(withOffers,C.weekDates('2023-02-01')), beforeCompare,'Price comparisons must not become expenses');
+assert(html.includes('id="priceComparePanel"'));
+assert(html.indexOf('id="priceComparePanel"') > html.indexOf('id="view-more"'));
+assert(app.includes('function renderPriceTool()'));
+assert(app.includes('priceOffers: offers'));
+assert(html.includes('id="priceProduct"'));
+console.log('✓ v1.6.0 comparison checks: Fanta, ketchup, weights, validation, backups, no accounting side effects.');

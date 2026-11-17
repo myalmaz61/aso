@@ -1,4 +1,4 @@
-/* Aroma — Седмичен отчет v1.3.0: pure date and accounting functions. */
+/* Aroma — Седмичен отчет v1.6.0: pure date, accounting and price comparison functions. */
 (function (root, factory) {
   const api = factory();
   if (typeof module === 'object' && module.exports) module.exports = api;
@@ -164,12 +164,41 @@
     if (!entered) throw new Error('Попълни поне едно поле — Cash или Card.');
     return { ...data, records };
   }
+  // v1.6.0 — independent price comparisons, stored only as optional offers.
+  // Quantity is normalized into pieces, ml or g. Results show £ per 1 piece/litre/kg.
+  const PRICE_UNITS = { pc: ['count', 1], ml: ['volume', 1], l: ['volume', 1000], g: ['weight', 1], kg: ['weight', 1000] };
+  function priceMeasure(raw, unit) {
+    if (!Object.prototype.hasOwnProperty.call(PRICE_UNITS, unit)) throw new Error('Избери правилна мярка.');
+    const s = String(raw).trim().replace(',', '.');
+    if (!/^\d+(?:\.\d{1,3})?$/.test(s)) throw new Error('Въведи положително количество, например 8, 750 или 1.5.');
+    const quantity = Number(s);
+    if (!Number.isFinite(quantity) || quantity <= 0 || quantity > 1000000) throw new Error('Количеството е извън допустимите граници.');
+    if (unit === 'pc' && !Number.isInteger(quantity)) throw new Error('За бройка използвай цяло число.');
+    const baseQty = Math.round(quantity * PRICE_UNITS[unit][1] * 1000) / 1000;
+    if (baseQty <= 0 || baseQty > 1000000000) throw new Error('Количеството е твърде голямо или малко.');
+    return { quantity, unit, baseQty, group: PRICE_UNITS[unit][0] };
+  }
+  function priceRate(offer) {
+    const m = priceMeasure(String(offer.quantity), offer.unit);
+    return offer.totalPence * (m.group === 'count' ? 1 : 1000) / m.baseQty; // pence per pc/L/kg
+  }
+  function priceGroup(unit) { return PRICE_UNITS[unit]?.[0] || ''; }
+  function priceKey(name) { return String(name).trim().replace(/\s+/g, ' ').toLocaleLowerCase('bg'); }
+  function validPriceOffer(o) {
+    if (!o || typeof o !== 'object' || typeof o.id !== 'string' || !/^[A-Za-z0-9_-]{1,80}$/.test(o.id) ||
+        typeof o.product !== 'string' || !o.product.trim() || o.product.length > 80 ||
+        typeof o.shop !== 'string' || o.shop.length > 80 ||
+        !Number.isSafeInteger(o.totalPence) || o.totalPence < 1 || o.totalPence > 10000000000 || !validDate(o.date)) return false;
+    try { return priceMeasure(String(o.quantity), o.unit).quantity === o.quantity; }
+    catch (_) { return false; }
+  }
   function emptyData() {
-    return { schema: 1, records: [], bills: [], days: {}, reviewedWeeks: {}, settings: { feeBps: 169 }, lastBackupAt: null };
+    return { schema: 1, records: [], bills: [], days: {}, reviewedWeeks: {}, settings: { feeBps: 169 }, priceOffers: [], lastBackupAt: null };
   }
   function validState(data) {
     if (!data || data.schema !== 1 || !Array.isArray(data.records) || !Array.isArray(data.bills) || !data.settings || !Number.isInteger(data.settings.feeBps) || data.settings.feeBps < 0 || data.settings.feeBps > 5000) return false;
     if (data.records.length > 150000 || data.bills.length > 2000) return false;
+    if (data.priceOffers !== undefined && (!Array.isArray(data.priceOffers) || data.priceOffers.length > 3000 || data.priceOffers.some(o => !validPriceOffer(o)) || new Set(data.priceOffers.map(o=>o.id)).size !== data.priceOffers.length)) return false;
     const idOk = id => typeof id === 'string' && /^[A-Za-z0-9_-]{1,80}$/.test(id);
     const amtOk = v => Number.isSafeInteger(v) && Math.abs(v) <= 10000000000;
     if (data.records.some(r => !idOk(r.id) || !validDate(r.date) || !['income','expense','payment'].includes(r.kind) || !amtOk(r.amountPence) || typeof r.note !== 'string' || r.note.length > 500 || (r.kind === 'income' && !['cash','card','other'].includes(r.method)) || (r.kind === 'expense' && !['purchase','other'].includes(r.category)) || (r.kind === 'payment' && (!idOk(r.billId) || !validMonth(r.forMonth))))) return false;
@@ -179,5 +208,5 @@
     if (new Set(data.records.map(r => r.id)).size !== data.records.length || new Set(data.bills.map(b => b.id)).size !== data.bills.length) return false;
     return true;
   }
-  return { validDate, validMonth, today, addDays, dayOfWeek, weekStart, weekDates, monthDates, monthOf, money, parseMoney, billAmount, billDailyShare, dateSummary, periodSummary, cardSettlementDate, cardSettlementSchedule, fingerprint, dailyZId, dailyZRecord, applyDailyTurnover, emptyData, validState };
+  return { validDate, validMonth, today, addDays, dayOfWeek, weekStart, weekDates, monthDates, monthOf, money, parseMoney, billAmount, billDailyShare, dateSummary, periodSummary, cardSettlementDate, cardSettlementSchedule, fingerprint, dailyZId, dailyZRecord, applyDailyTurnover, emptyData, validState, priceMeasure, priceRate, priceGroup, priceKey, validPriceOffer };
 });
