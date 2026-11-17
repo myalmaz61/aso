@@ -1,8 +1,10 @@
-/* Aroma — Седмичен отчет v1.7.0. All bookkeeping data stays in this browser. */
+/* Aroma — Седмичен отчет v1.8.0. All bookkeeping data stays in this browser. */
 (() => {
   'use strict';
   const C = window.AromaCore;
   const KEY = 'aroma.weekly.v1';
+  // An unfinished price quote is separate from confirmed offers and financial data.
+  const PRICE_DRAFT_KEY = 'aroma.price-draft.v1';
   const $ = id => document.getElementById(id);
   const GBP = C.money;
   const esc = value => String(value ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -209,6 +211,64 @@
     element.hidden = !message;
     element.classList.toggle('price-save-error', isError);
   }
+  // v1.8.0: restore an unfinished price comparison after accidental reload/closure.
+  // Draft writes never touch aroma.weekly.v1, and a draft is never an actual expense.
+  function updatePriceClearButton() {
+    const editing = Boolean($('priceOfferId').value);
+    const hasDetails = Boolean($('priceQuantity').value.trim() || $('priceTotal').value.trim() || $('priceShop').value.trim());
+    $('priceCancelEdit').textContent = editing ? 'Отказ от редакцията' : 'Изчисти';
+    $('priceCancelEdit').hidden = !editing && !hasDetails;
+  }
+  function clearPriceDraftFromStorage() {
+    try { localStorage.removeItem(PRICE_DRAFT_KEY); }
+    catch (_) { /* The confirmed offer uses the independent accounting storage. */ }
+    $('priceDraftInfo').hidden = true;
+    $('priceDraftInfo').textContent = '';
+  }
+  function persistPriceDraft() {
+    const draft = {
+      version: 1,
+      id: $('priceOfferId').value,
+      product: $('priceProduct').value,
+      quantity: $('priceQuantity').value,
+      unit: $('priceUnit').value,
+      total: $('priceTotal').value,
+      shop: $('priceShop').value
+    };
+    updatePriceClearButton();
+    try {
+      if (draft.product.trim() || draft.quantity.trim() || draft.total.trim() || draft.shop.trim()) {
+        localStorage.setItem(PRICE_DRAFT_KEY, JSON.stringify(draft));
+      } else localStorage.removeItem(PRICE_DRAFT_KEY);
+      // Show this notice only after recovery, not while routinely entering data.
+    } catch (_) {
+      $('priceDraftInfo').textContent = 'Черновата не може да се пази автоматично. Запази офертата, преди да затвориш приложението.';
+      $('priceDraftInfo').hidden = false;
+    }
+  }
+  function restorePriceDraft() {
+    try {
+      const raw = localStorage.getItem(PRICE_DRAFT_KEY);
+      if (!raw) return;
+      const draft = JSON.parse(raw);
+      const fields = [['product',80],['quantity',16],['total',15],['shop',80]];
+      if (!draft || draft.version !== 1 || !['pc','ml','l','g','kg'].includes(draft.unit) ||
+          fields.some(([field, limit]) => typeof draft[field] !== 'string' || draft[field].length > limit) ||
+          typeof draft.id !== 'string' || draft.id.length > 80) return;
+      // If an offer was removed since the edit began, keep the values as a NEW offer.
+      const id = priceOffers().some(offer => offer.id === draft.id) ? draft.id : '';
+      $('priceOfferId').value = id;
+      $('priceProduct').value = draft.product;
+      $('priceQuantity').value = draft.quantity;
+      $('priceUnit').value = draft.unit;
+      $('priceTotal').value = draft.total;
+      $('priceShop').value = draft.shop;
+      $('priceSave').textContent = id ? 'Запази поправката' : 'Запази офертата';
+      $('priceDraftInfo').textContent = 'Възстановена е недовършена оферта. Провери я и натисни „Запази офертата“, когато си готов.';
+      $('priceDraftInfo').hidden = false;
+      updatePriceClearButton();
+    } catch (_) { /* A damaged optional draft must never prevent Aroma from opening. */ }
+  }
   function enteredPriceOffer() {
     const name = selectedPriceProduct();
     if (!name || name.length > 80) throw new Error('Попълни име на продукт (например Fanta 330 мл).');
@@ -230,7 +290,8 @@
     $('priceTotal').value = '';
     $('priceShop').value = '';
     $('priceSave').textContent = 'Запази офертата';
-    $('priceCancelEdit').hidden = true;
+    clearPriceDraftFromStorage();
+    updatePriceClearButton();
     renderPriceTool();
   }
   function priceOfferComparison(product, group, collection) {
@@ -248,6 +309,7 @@
     return result;
   }
   function renderPriceTool() {
+    updatePriceClearButton();
     const offers = priceOffers();
     const names = [...new Map(offers.map(o => [C.priceKey(o.product), o.product])).values()].sort((a,b) => a.localeCompare(b,'bg'));
     $('priceProductOptions').innerHTML = names.map(n => `<option value="${esc(n)}"></option>`).join('');
@@ -326,8 +388,8 @@
     $('priceTotal').value = textMoney(offer.totalPence);
     $('priceShop').value = offer.shop;
     $('priceSave').textContent = 'Запази поправката';
-    $('priceCancelEdit').hidden = false;
     showPriceStatus('');
+    persistPriceDraft();
     renderPriceTool();
     $('priceForm').scrollIntoView({block:'start', behavior:'smooth'});
   }
@@ -347,10 +409,11 @@
     if (last) $('priceUnit').value = last.unit;
     $('priceOfferId').value = '';
     $('priceSave').textContent = 'Запази офертата';
-    $('priceCancelEdit').hidden = true;
     $('priceQuantity').value = '';
     $('priceTotal').value = '';
+    $('priceShop').value = '';
     showPriceStatus('');
+    persistPriceDraft();
     renderPriceTool();
   }
   function renderMore() {
@@ -680,11 +743,11 @@
     $('reportMonth').addEventListener('change', e => { if (C.validMonth(e.target.value)) { reportMonth = e.target.value; renderReports(); } });
     $('priceForm').addEventListener('submit', savePriceOffer);
     ['priceProduct','priceQuantity','priceUnit','priceTotal','priceShop'].forEach(id => {
-      $(id).addEventListener('input', () => { showPriceStatus(''); renderPriceTool(); });
-      if (id === 'priceUnit') $(id).addEventListener('change', () => { showPriceStatus(''); renderPriceTool(); });
+      $(id).addEventListener('input', () => { showPriceStatus(''); persistPriceDraft(); renderPriceTool(); });
+      if (id === 'priceUnit') $(id).addEventListener('change', () => { showPriceStatus(''); persistPriceDraft(); renderPriceTool(); });
     });
     $('priceSearch').addEventListener('input', renderPriceTool);
-    $('priceCancelEdit').addEventListener('click', () => { clearPriceEditor(); showPriceStatus(''); });
+    $('priceCancelEdit').addEventListener('click', () => { const editing = Boolean($('priceOfferId').value); clearPriceEditor(editing); showPriceStatus(''); });
     $('saveFee').addEventListener('click', saveFee);
     $('backup').addEventListener('click', backup);
     $('restoreFile').addEventListener('change', e => restore(e.target.files[0]));
@@ -707,6 +770,6 @@
     window.addEventListener('beforeinstallprompt', event => { event.preventDefault(); installPrompt = event; $('installApp').hidden = false; });
     $('installApp').addEventListener('click', async () => { if (!installPrompt) return; installPrompt.prompt(); await installPrompt.userChoice; installPrompt = null; $('installApp').hidden = true; });
   }
-  data = load(); lastSavedState = structuredClone(data); registerListeners(); renderAll();
+  data = load(); lastSavedState = structuredClone(data); restorePriceDraft(); registerListeners(); renderAll();
   if ('serviceWorker' in navigator) navigator.serviceWorker.register('./sw.js').catch(error => console.warn('Service worker:', error));
 })();

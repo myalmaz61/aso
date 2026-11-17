@@ -228,3 +228,7 @@ h2 { margin: 0; }
 .price-product-count { opacity: .74; }
 .price-tie-note { margin: 2px 0 11px; color: #34634f; font-size: 12px; line-height: 1.5; }
 .price-comparison h3:not(:first-child) { margin-top: 20px; }
+
+/* v1.8.0 — optional unobtrusive restored price draft notice. */
+.price-draft-info { margin: 10px 0 0; color: var(--muted); font-size: 12px; line-height: 1.5; }
+.price-draft-info[hidden] { display: none !important; }

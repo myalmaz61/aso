@@ -55,7 +55,7 @@ assert(app.includes('data-action="day-income"'));
 assert(app.includes('data-action="day-expense"'));
 assert(app.includes('data-action="day-records"'));
 assert(app.includes("const KEY = 'aroma.weekly.v1'"));
-assert(sw.includes("const CACHE = 'aroma-weekly-v1.7.0'"));
+assert(sw.includes("const CACHE = 'aroma-weekly-v1.8.0'"));
 assert(html.includes('id="turnoverDialog"'));
 assert(app.includes('data-action="day-turnover"'));
 assert(html.includes('id="weekTurnover"'));
@@ -136,7 +136,7 @@ const reversed = JSON.stringify(C.cardSettlementSchedule(bank,C.weekDates('2026-
 assert.equal(JSON.stringify(C.cardSettlementSchedule(bank,C.weekDates('2026-11-16'))),reversed,'Deterministic settlement plan');
 assert(html.includes('id="settlementWeek"'));
 assert(html.includes('id="settlementMonth"'));
-assert(html.includes('Aroma — версия 1.7.0'));
+assert(html.includes('Aroma — версия 1.8.0'));
 assert(app.includes('C.cardSettlementDate(day.date)'));
 assert(app.includes('C.cardSettlementSchedule(data, dates)'));
 console.log('✓ v1.3.0 card settlement checks passed: weekday rules, Friday–Sunday Monday merge, cross-week/month, charges and UI wiring.');
@@ -223,5 +223,14 @@ assert(app.includes('price-tie-note'), 'Equal prices explicitly identified');
 assert(app.includes("$('priceSearch').addEventListener('input', renderPriceTool)"));
 const same=[{quantity:12,unit:'pc',totalPence:400},{quantity:18,unit:'pc',totalPence:600},{quantity:24,unit:'pc',totalPence:800}];
 assert(same.every(x=>Math.abs(C.priceRate(x)-C.priceRate(same[0]))<1e-7));
-assert(html.includes('app.js?v=1.7.0'), 'HTML versioned to reduce stale code after update');
+assert(html.includes('app.js?v=1.8.0'), 'HTML versioned to reduce stale code after update');
 console.log('✓ v1.7.0: price search, save confirmation, equal prices and cache-busting links.');
+
+// v1.8.0: optional in-progress offer is independent of real financial records.
+assert(app.includes("const PRICE_DRAFT_KEY = 'aroma.price-draft.v1'"));
+assert(app.includes('function persistPriceDraft()'));
+assert(app.includes('function restorePriceDraft()'));
+assert(app.includes('function clearPriceDraftFromStorage()'));
+assert(html.includes('id="priceDraftInfo"'));
+assert(app.includes('restorePriceDraft(); registerListeners(); renderAll();'));
+console.log('✓ v1.8.0: draft safety and unchanged financial storage key.');
