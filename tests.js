@@ -55,7 +55,7 @@ assert(app.includes('data-action="day-income"'));
 assert(app.includes('data-action="day-expense"'));
 assert(app.includes('data-action="day-records"'));
 assert(app.includes("const KEY = 'aroma.weekly.v1'"));
-assert(sw.includes("const CACHE = 'aroma-weekly-v1.9.0'"));
+assert(sw.includes("const CACHE = 'aroma-weekly-v1.10.0'"));
 assert(html.includes('id="turnoverDialog"'));
 assert(app.includes('data-action="day-turnover"'));
 assert(html.includes('id="weekTurnover"'));
@@ -136,7 +136,7 @@ const reversed = JSON.stringify(C.cardSettlementSchedule(bank,C.weekDates('2026-
 assert.equal(JSON.stringify(C.cardSettlementSchedule(bank,C.weekDates('2026-11-16'))),reversed,'Deterministic settlement plan');
 assert(html.includes('id="settlementWeek"'));
 assert(html.includes('id="settlementMonth"'));
-assert(html.includes('Aroma — версия 1.9.0'));
+assert(html.includes('Aroma — версия 1.10.0'));
 assert(app.includes('C.cardSettlementDate(day.date)'));
 assert(app.includes('C.cardSettlementSchedule(data, dates)'));
 console.log('✓ v1.3.0 card settlement checks passed: weekday rules, Friday–Sunday Monday merge, cross-week/month, charges and UI wiring.');
@@ -223,23 +223,35 @@ assert(app.includes('price-tie-note'), 'Equal prices explicitly identified');
 assert(app.includes("$('priceSearch').addEventListener('input', renderPriceTool)"));
 const same=[{quantity:12,unit:'pc',totalPence:400},{quantity:18,unit:'pc',totalPence:600},{quantity:24,unit:'pc',totalPence:800}];
 assert(same.every(x=>Math.abs(C.priceRate(x)-C.priceRate(same[0]))<1e-7));
-assert(html.includes('app.js?v=1.9.0'), 'HTML versioned to reduce stale code after update');
+assert(html.includes('app.js?v=1.10.0'), 'HTML versioned to reduce stale code after update');
 console.log('✓ v1.7.0: price search, save confirmation, equal prices and cache-busting links.');
 
-// v1.9.0: optional in-progress offer is independent of real financial records.
+// v1.10.0: optional in-progress offer is independent of real financial records.
 assert(app.includes("const PRICE_DRAFT_KEY = 'aroma.price-draft.v1'"));
 assert(app.includes('function persistPriceDraft()'));
 assert(app.includes('function restorePriceDraft()'));
 assert(app.includes('function clearPriceDraftFromStorage()'));
 assert(html.includes('id="priceDraftInfo"'));
 assert(app.includes('restorePriceDraft(); registerListeners(); renderAll();'));
-console.log('✓ v1.9.0: draft safety and unchanged financial storage key.');
+console.log('✓ v1.10.0: draft safety and unchanged financial storage key.');
 
-// v1.9.0: guard a Z-report date change, keep the backup reminder in More,
+// v1.10.0: guard a Z-report date change, keep the backup reminder in More,
 // and avoid mutating financial data before validation.
 assert(app.includes('function changeTurnoverDate()'));
 assert(app.includes('Има незаписани Cash/Card суми'));
 assert(app.includes("$('turnoverDate').addEventListener('change', changeTurnoverDate)"));
 assert(app.includes('Препоръчително е да направиш нов JSON архив.'));
 assert(app.includes('const candidate = structuredClone(data)'));
-console.log('✓ v1.9.0: safeguards for editing, backup reminder and transactional validation.');
+console.log('✓ v1.10.0: safeguards for editing, backup reminder and transactional validation.');
+
+// v1.10.0: the offline cache must contain the *exact* versioned URLs
+// referenced by the HTML, not just the unversioned filenames.
+const serviceWorker = fs.readFileSync(__dirname + '/sw.js', 'utf8');
+for (const resource of ['styles.css','logic.js','app.js']) {
+  assert(html.includes(`./${resource}?v=1.10.0`));
+  assert(serviceWorker.includes(`./${resource}?v=1.10.0`), `Offline cache missing ${resource}`);
+}
+assert(serviceWorker.includes("const shouldCache = isPage || CACHEABLE.has(url.href)"), 'Only static assets are cacheable');
+assert(app.includes('включително офертите'), 'Archive restoration must warn that offers are replaced');
+assert(app.includes("navigator.serviceWorker.register('./sw.js', { updateViaCache: 'none' })"));
+console.log('✓ v1.10.0 offline assets and archive overwrite warnings verified.');

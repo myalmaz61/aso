@@ -1,4 +1,4 @@
-/* Aroma — Седмичен отчет v1.9.0. All bookkeeping data stays in this browser. */
+/* Aroma — Седмичен отчет v1.10.0. All bookkeeping data stays in this browser. */
 (() => {
   'use strict';
   const C = window.AromaCore;
@@ -702,7 +702,7 @@
       if (json.format !== 'aroma-weekly-backup' || json.version !== 1 || !json.payload || typeof json.checksumSHA256 !== 'string') throw new Error('Това не е архив на Aroma v1.');
       if (await digest(JSON.stringify(json.payload)) !== json.checksumSHA256) throw new Error('Контролната сума не съвпада. Файлът може да е повреден.');
       if (!C.validState(json.payload)) throw new Error('Невалидни или несъвместими записи.');
-      if (!confirm(`Архивът съдържа ${json.payload.records.length} записа и ${json.payload.bills.length} месечни сметки.\n\nДа ЗАМЕНЯ ли всички текущи данни на този телефон? Това действие не може да се отмени.`)) return;
+      if (!confirm(`Архивът съдържа ${json.payload.records.length} финансови записа, ${json.payload.bills.length} месечни сметки и ${(json.payload.priceOffers || []).length} запазени оферти.\n\nВ момента има ${data.records.length} финансови записа, ${data.bills.length} месечни сметки и ${(data.priceOffers || []).length} оферти.\n\nВъзстановяването ще ЗАМЕНИ ВСИЧКО, включително офертите. Направи архив на сегашните данни, преди да продължиш.\n\nДа възстановя ли този архив?`)) return;
       const previous = data;
       data = json.payload;
       if (!canWrite || !store()) { data = previous; throw new Error('Новите данни не могат да се съхранят.'); }
@@ -812,5 +812,5 @@
     $('installApp').addEventListener('click', async () => { if (!installPrompt) return; installPrompt.prompt(); await installPrompt.userChoice; installPrompt = null; $('installApp').hidden = true; });
   }
   data = load(); lastSavedState = structuredClone(data); restorePriceDraft(); registerListeners(); renderAll();
-  if ('serviceWorker' in navigator) navigator.serviceWorker.register('./sw.js').catch(error => console.warn('Service worker:', error));
+  if ('serviceWorker' in navigator) navigator.serviceWorker.register('./sw.js', { updateViaCache: 'none' }).catch(error => console.warn('Service worker:', error));
 })();
