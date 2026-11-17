@@ -55,7 +55,7 @@ assert(app.includes('data-action="day-income"'));
 assert(app.includes('data-action="day-expense"'));
 assert(app.includes('data-action="day-records"'));
 assert(app.includes("const KEY = 'aroma.weekly.v1'"));
-assert(sw.includes("const CACHE = 'aroma-weekly-v1.3.0'"));
+assert(sw.includes("const CACHE = 'aroma-weekly-v1.4.0'"));
 assert(html.includes('id="turnoverDialog"'));
 assert(app.includes('data-action="day-turnover"'));
 assert(html.includes('id="weekTurnover"'));
@@ -136,7 +136,22 @@ const reversed = JSON.stringify(C.cardSettlementSchedule(bank,C.weekDates('2026-
 assert.equal(JSON.stringify(C.cardSettlementSchedule(bank,C.weekDates('2026-11-16'))),reversed,'Deterministic settlement plan');
 assert(html.includes('id="settlementWeek"'));
 assert(html.includes('id="settlementMonth"'));
-assert(html.includes('Aroma — версия 1.3.0'));
+assert(html.includes('Aroma — версия 1.4.0'));
 assert(app.includes('C.cardSettlementDate(day.date)'));
 assert(app.includes('C.cardSettlementSchedule(data, dates)'));
 console.log('✓ v1.3.0 card settlement checks passed: weekday rules, Friday–Sunday Monday merge, cross-week/month, charges and UI wiring.');
+
+// v1.4.0: daily cash/card is now primary; individual income remains in Records.
+assert.match(html, /<div class="quick-actions"><button id="weekTurnover" class="primary-button"[^>]+data-action="open-turnover"/);
+const mainWeek = html.slice(html.indexOf('<section id="view-week"'), html.indexOf('</section>'));
+const mainQuick = mainWeek.match(/<div class="quick-actions">([\s\S]*?)<\/div>/)[1];
+assert.equal((mainQuick.match(/<button /g) || []).length, 2, 'Only two main action buttons');
+assert(!mainQuick.includes('data-action="add-income"'), 'Manual income is not primary');
+assert(mainQuick.includes('data-action="add-expense"'));
+assert(html.includes('id="view-records"') && html.includes('data-action="add-income"'));
+assert(html.includes('id="turnoverExisting" class="turnover-existing" aria-live="polite" hidden'));
+assert(app.includes("$('turnoverExisting').hidden = !outside.length"));
+assert(!app.includes('Без други Cash/Card записи'), 'Remove unnecessary neutral info');
+assert(app.includes('Общо Cash + Card:'));
+assert(app.includes('C.applyDailyTurnover(data, date, amounts)'));
+console.log('✓ v1.4.0 simplification tests passed: two primary actions, preserved manual income and safety warnings.');

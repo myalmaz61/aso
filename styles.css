@@ -183,3 +183,8 @@ h2 { margin: 0; }
 .settlement-line { display: flex; align-items: baseline; justify-content: space-between; flex-wrap: wrap; gap: 9px; font-size: 12px; }
 .settlement-line strong:last-child { color: var(--primary); font-size: 15px; font-variant-numeric: tabular-nums; }
 .settlement-empty { font-size: 12px; line-height: 1.65; color: var(--muted); margin: 0; }
+
+/* v1.4.0 — two main actions, compact everyday form; warnings remain visible when needed. */
+.turnover-existing[hidden] { display: none !important; }
+#weekTurnover { font-size: 15px; }
+.turnover-preview small { font-size: 11px; color: var(--muted); }

@@ -1,4 +1,4 @@
-/* Aroma — Седмичен отчет v1.3.0. All bookkeeping data stays in this browser. */
+/* Aroma — Седмичен отчет v1.4.0. All bookkeeping data stays in this browser. */
 (() => {
   'use strict';
   const C = window.AromaCore;
@@ -160,7 +160,7 @@
   function refreshTurnoverForm(resetValues = false) {
     const date = $('turnoverDate').value;
     if (!C.validDate(date)) {
-      $('turnoverExisting').textContent = 'Избери валидна дата.';
+      $('turnoverExisting').hidden = true;
       $('turnoverPreview').textContent = '';
       return;
     }
@@ -174,10 +174,11 @@
       const outside = data.records.filter(r => r.date === date && r.kind === 'income' && (r.method === 'cash' || r.method === 'card') && r.id !== C.dailyZId(date, r.method));
       const outsideCash = outside.filter(r => r.method === 'cash').reduce((s,r) => s+r.amountPence,0);
       const outsideCard = outside.filter(r => r.method === 'card').reduce((s,r) => s+r.amountPence,0);
+      $('turnoverExisting').hidden = !outside.length;
       $('turnoverExisting').classList.toggle('warning', outside.length > 0);
       $('turnoverExisting').innerHTML = outside.length
-        ? `<strong>Внимание: има и други продажби за този ден</strong>${outside.length} отделни записа (Cash ${GBP(outsideCash)}, Card ${GBP(outsideCard)}). Те няма да бъдат променени. Ако съдържат същите суми като Z отчета, първо ги провери в „Записи“, за да няма двойно отчитане.`
-        : '<strong>Без други Cash/Card записи</strong>Този формуляр пази по един дневен Z запис за Cash и Card.';
+        ? `<strong>Внимание: други Cash/Card записи</strong>Има ${outside.length} отделни записа за този ден (Cash ${GBP(outsideCash)}, Card ${GBP(outsideCard)}). Ако са част от същия Z отчет, първо ги провери в „Записи“, за да няма двойно отчитане.`
+        : '';
       const amounts = {};
       let any = false;
       for (const method of ['cash', 'card']) {
@@ -194,7 +195,7 @@
       const candidate = C.applyDailyTurnover(data, date, amounts);
       const s = C.dateSummary(candidate, date);
       $('turnoverPreview').classList.remove('error');
-      $('turnoverPreview').innerHTML = `<strong>Дневен сбор след записване</strong>Cash: ${GBP(s.cash)} · Card: ${GBP(s.card)}<br>Картова такса (прогноза): ${GBP(s.cardFee)}${s.card !== 0 ? `<br>Очакван банков превод: ${GBP(s.card - s.cardFee)} на ${dateLabel(C.cardSettlementDate(date))}` : ''}`;
+      $('turnoverPreview').innerHTML = `<strong>Общо Cash + Card: ${GBP(s.cash + s.card)}</strong>В брой ${GBP(s.cash)} · Карта ${GBP(s.card)}${outside.length ? '<br><small>Включва и отделните Cash/Card записи.</small>' : ''}`;
     } catch (error) {
       $('turnoverPreview').classList.add('error');
       $('turnoverPreview').textContent = error.message;

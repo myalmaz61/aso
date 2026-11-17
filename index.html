@@ -25,8 +25,7 @@
         <div class="period-selector"><button id="prevWeek" aria-label="Предишна седмица" class="circle-button" type="button">‹</button><div class="period-center"><span id="weekPeriod" class="period-title"></span><span class="period-caption">Понеделник – неделя</span></div><button id="nextWeek" aria-label="Следваща седмица" class="circle-button" type="button">›</button></div>
         <div class="week-top-cards"><div class="mini-stat"><span>Приходи</span><strong id="weekIncome">£0.00</strong></div><div class="mini-stat"><span>Разходи</span><strong id="weekExpenses">£0.00</strong></div></div>
         <div class="result-card"><div><span>Резултат за седмицата</span><strong id="weekResult">£0.00</strong><small>Приходи минус разходи, включително месечния дял</small></div><span class="result-symbol">↗</span></div>
-        <div class="quick-actions"><button class="primary-button" type="button" data-action="add-income">＋ Приход</button><button class="secondary-button" type="button" data-action="add-expense">＋ Разход</button></div>
-        <button id="weekTurnover" class="turnover-shortcut" type="button" data-action="open-turnover">Cash + Card за деня <span aria-hidden="true">›</span></button>
+        <div class="quick-actions"><button id="weekTurnover" class="primary-button" type="button" data-action="open-turnover">Cash + Card</button><button class="secondary-button" type="button" data-action="add-expense">＋ Разход</button></div>
         <div id="weekWarnings" class="message-slot" aria-live="polite"></div>
         <details id="weekDetails" class="details-panel"><summary>Виж подробности <span class="summary-chevron">⌄</span></summary><div class="details-body"><div id="weeklyBreakdown"></div><h2 class="subheading">Дни от седмицата</h2><div id="weekDays"></div></div></details>
         <div class="review-panel"><div id="reviewInfo"><strong>Проверка на седмицата</strong><p>Отбележи, когато си прегледал записите.</p></div><button id="reviewToggle" class="small-outline" type="button">Седмицата е проверена</button></div>
@@ -68,7 +67,7 @@
         <div class="section-intro"><div><div class="eyebrow">НАСТРОЙКИ И ЗАЩИТА</div><h1>Още</h1></div></div>
         <div class="settings-card"><h2 class="subheading">Картови плащания</h2><label for="cardFee">Ориентировъчна такса на POS терминала (%)</label><div class="inline-input"><input id="cardFee" type="text" inputmode="decimal" maxlength="5" value="1.69"><button id="saveFee" class="small-outline" type="button">Запази</button></div><p class="hint-text">Продажбата се записва в деня на Z отчета в пълния размер. Таксата се приспада като разход. Очакваните банкови постъпления са: продажби от понеделник–четвъртък на следващия ден; продажби от петък, събота и неделя — в понеделник. Не са втори приход. Посочените дати са ориентировъчни; празници и платежният оператор могат да ги променят.</p></div>
         <div class="settings-card"><h2 class="subheading">Архив и възстановяване</h2><p class="muted">Данните се пазят само в този браузър на телефона. GitHub не получава финансовите ти записи.</p><button id="backup" type="button" class="primary-button full">Изтегли пълен JSON архив</button><p id="lastBackup" class="hint-text"></p><label class="secondary-button full file-label" for="restoreFile">Възстанови от JSON архив</label><input id="restoreFile" type="file" accept="application/json,.json" hidden><p class="hint-text">Възстановяването замества текущите данни след потвърждение. Първо направи архив.</p></div>
-        <div class="settings-card"><h2 class="subheading">Инсталиране и офлайн</h2><button id="installApp" type="button" class="secondary-button full" hidden>Инсталирай приложението</button><p class="hint-text">Android Chrome → меню ⋮ → „Добавяне към началния екран“ или „Инсталиране“. След първото онлайн отваряне приложението може да работи офлайн.</p><span id="versionText" class="version">Aroma — версия 1.3.0</span></div>
+        <div class="settings-card"><h2 class="subheading">Инсталиране и офлайн</h2><button id="installApp" type="button" class="secondary-button full" hidden>Инсталирай приложението</button><p class="hint-text">Android Chrome → меню ⋮ → „Добавяне към началния екран“ или „Инсталиране“. След първото онлайн отваряне приложението може да работи офлайн.</p><span id="versionText" class="version">Aroma — версия 1.4.0</span></div>
       </section>
     </main>
 
@@ -78,14 +77,14 @@
   <dialog id="turnoverDialog" class="modal">
     <form id="turnoverForm" method="dialog" novalidate>
       <div class="modal-heading"><h2>Дневен оборот</h2><button type="button" class="close-button" data-action="close-turnover" aria-label="Затвори">×</button></div>
-      <p class="muted">Въведи Cash и Card от Z отчета за избрания ден. Можеш и само едното.</p>
+      <p class="muted">Въведи сумите от Z отчета за деня.</p>
       <div class="form-field"><label for="turnoverDate">Дата на Z отчета</label><input id="turnoverDate" type="date" required></div>
       <div class="turnover-grid">
         <div class="form-field"><label for="turnoverCash">В брой · Cash (£)</label><input id="turnoverCash" type="text" inputmode="decimal" maxlength="15" placeholder="Напр. 125.60" autocomplete="off"></div>
         <div class="form-field"><label for="turnoverCard">С карта · Card (£)</label><input id="turnoverCard" type="text" inputmode="decimal" maxlength="15" placeholder="Напр. 208.90" autocomplete="off"></div>
       </div>
-      <p class="hint-text">Празно поле = без промяна. Въведи 0, ако сумата е нула. При повторно записване за същия ден приложението <strong>обновява</strong> този дневен Z отчет, без да го дублира.</p>
-      <div id="turnoverExisting" class="turnover-existing" aria-live="polite"></div>
+      <p class="hint-text">Празно = без промяна · 0 = нулева сума. При поправка същият дневен запис се обновява.</p>
+      <div id="turnoverExisting" class="turnover-existing" aria-live="polite" hidden></div>
       <div id="turnoverPreview" class="turnover-preview" aria-live="polite"></div>
       <div class="modal-actions"><button class="secondary-button" type="button" data-action="close-turnover">Отказ</button><button class="primary-button" type="submit">Запази оборота</button></div>
     </form>
