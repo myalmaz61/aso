@@ -1,4 +1,4 @@
-/* Aroma — Седмичен отчет v1.8.0. All bookkeeping data stays in this browser. */
+/* Aroma — Седмичен отчет v1.9.0. All bookkeeping data stays in this browser. */
 (() => {
   'use strict';
   const C = window.AromaCore;
@@ -19,6 +19,8 @@
   let activeView = 'week', recordsDateFilter = null, canWrite = true, installPrompt = null, toastTimer = null, lastSavedState = null;
   // v1.5.0: never overwrite a newer saved version from another open tab/PWA window.
   let lastSavedRaw = null, storageConflict = false;
+  // Remember which Z-report amounts were loaded before switching the date.
+  let turnoverLoadedDate = '', turnoverLoadedAmounts = { cash: '', card: '' };
   const editorDialogs = ['turnoverDialog', 'entryDialog', 'billDialog', 'actualDialog'];
   const editorSnapshots = new Map();
   function editorSnapshot(id) {
@@ -419,7 +421,15 @@
   function renderMore() {
     renderPriceTool();
     $('cardFee').value = (data.settings.feeBps / 100).toFixed(2);
-    $('lastBackup').textContent = data.lastBackupAt ? 'Последен създаден архив: ' + new Intl.DateTimeFormat('bg-BG', { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(data.lastBackupAt)) : 'Все още няма създаден архив.';
+    const backupTime = data.lastBackupAt ? Date.parse(data.lastBackupAt) : NaN;
+    const hasWork = data.records.length > 0 || data.bills.length > 0 || priceOffers().length > 0;
+    const needsBackup = hasWork && (!Number.isFinite(backupTime) || Date.now() - backupTime >= 14 * 86400000);
+    const backupLabel = Number.isFinite(backupTime)
+      ? 'Последен създаден архив: ' + new Intl.DateTimeFormat('bg-BG', { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(backupTime))
+      : 'Все още няма създаден архив.';
+    $('lastBackup').textContent = needsBackup
+      ? backupLabel + ' Препоръчително е да направиш нов JSON архив.'
+      : backupLabel;
   }
   function renderAll() { renderWeek(); renderRecords(); renderBills(); renderReports(); renderMore(); updateOnline(); }
   function updateOnline() { $('networkIndicator').textContent = storageConflict ? '⚠ Презареди' : navigator.onLine ? 'Само в телефона' : '● Офлайн'; }
@@ -471,11 +481,30 @@
       $('turnoverPreview').textContent = error.message;
     }
   }
+  function captureTurnoverBaseline() {
+    turnoverLoadedDate = $('turnoverDate').value;
+    turnoverLoadedAmounts = { cash: $('turnoverCash').value, card: $('turnoverCard').value };
+    // Once a date change is deliberately accepted, its loaded values are the new baseline.
+    if ($('turnoverDialog').open) editorSnapshots.set('turnoverDialog', editorSnapshot('turnoverDialog'));
+  }
+  function changeTurnoverDate() {
+    const chosen = $('turnoverDate').value;
+    if (chosen === turnoverLoadedDate) return;
+    const amountsEdited = $('turnoverCash').value !== turnoverLoadedAmounts.cash ||
+      $('turnoverCard').value !== turnoverLoadedAmounts.card;
+    if (amountsEdited && !confirm('Има незаписани Cash/Card суми. При смяна на датата те ще бъдат заменени със сумите за новия ден. Да продължа ли?')) {
+      $('turnoverDate').value = turnoverLoadedDate;
+      return;
+    }
+    refreshTurnoverForm(true);
+    captureTurnoverBaseline();
+  }
   function openTurnover(selectedDate = '') {
     const date = C.validDate(selectedDate) ? selectedDate : turnoverDate();
     $('turnoverDate').value = date;
     refreshTurnoverForm(true);
     showEditor('turnoverDialog');
+    captureTurnoverBaseline();
   }
   function saveTurnover(event) {
     event.preventDefault();
@@ -541,10 +570,13 @@
         if (amountPence < 0) throw new Error('Плащането не може да е отрицателно.');
       } else throw new Error('Непознат вид операция.');
       if (newRecord.note.length > 500) throw new Error('Твърде дълга бележка.');
-      const old = id && data.records.findIndex(r => r.id === id);
+      // Build a candidate independently; bad input must never alter the live state.
+      const candidate = structuredClone(data);
+      const old = id && candidate.records.findIndex(r => r.id === id);
       if (id && old === -1) throw new Error('Записът не е намерен.');
-      if (id) data.records[old] = newRecord; else data.records.push(newRecord);
-      if (!C.validState(data)) throw new Error('Невалидни данни.');
+      if (id) candidate.records[old] = newRecord; else candidate.records.push(newRecord);
+      if (!C.validState(candidate)) throw new Error('Невалидни данни.');
+      data = candidate;
       if (commit('Записът е запазен.')) $('entryDialog').close();
     } catch (e) { alertProblem(e.message); }
   }
@@ -567,10 +599,13 @@
       const id = $('billId').value, title = $('billTitle').value.trim();
       const startMonth = $('billStart').value, estimatePence = C.parseMoney($('billEstimate').value);
       if (!title || title.length > 100 || !C.validMonth(startMonth)) throw new Error('Попълни име и валиден начален месец.');
-      const old = data.bills.find(b => b.id === id);
+      const candidate = structuredClone(data);
+      const old = candidate.bills.find(b => b.id === id);
+      if (id && !old) throw new Error('Сметката не е намерена.');
       const bill = { id: id || uid(), title, estimatePence, startMonth, actuals: old?.actuals || {} };
-      if (old) data.bills[data.bills.indexOf(old)] = bill; else data.bills.push(bill);
-      if (!C.validState(data)) throw new Error('Невалидни данни.');
+      if (old) candidate.bills[candidate.bills.indexOf(old)] = bill; else candidate.bills.push(bill);
+      if (!C.validState(candidate)) throw new Error('Невалидни данни.');
+      data = candidate;
       if (commit('Месечната сметка е запазена.')) $('billDialog').close();
     } catch (e) { alertProblem(e.message); }
   }
@@ -592,17 +627,23 @@
   function saveActual(event) {
     event.preventDefault();
     try {
-      const bill = data.bills.find(b => b.id === $('actualBillId').value);
+      const amount = C.parseMoney($('actualAmount').value);
+      const candidate = structuredClone(data);
+      const bill = candidate.bills.find(b => b.id === $('actualBillId').value);
       if (!bill) throw new Error('Сметката не е намерена.');
       if (billMonth < bill.startMonth) throw new Error('Месецът е преди началото на тази сметка.');
-      bill.actuals[billMonth] = C.parseMoney($('actualAmount').value);
+      bill.actuals[billMonth] = amount;
+      if (!C.validState(candidate)) throw new Error('Невалидни данни.');
+      data = candidate;
       if (commit('Реалната сума замени прогнозата.')) $('actualDialog').close();
     } catch (e) { alertProblem(e.message); }
   }
   function clearActual() {
-    const bill = data.bills.find(b => b.id === $('actualBillId').value);
+    const candidate = structuredClone(data);
+    const bill = candidate.bills.find(b => b.id === $('actualBillId').value);
     if (!bill) return;
     delete bill.actuals[billMonth];
+    data = candidate;
     if (commit('Върната е прогнозната сума.')) $('actualDialog').close();
   }
   function dayFlag(action, date) {
@@ -731,7 +772,7 @@
     $('reviewToggle').addEventListener('click', toggleReview);
     $('clearRecordsDate').addEventListener('click', () => { recordsDateFilter = null; renderRecords(); });
     $('turnoverForm').addEventListener('submit', saveTurnover);
-    $('turnoverDate').addEventListener('change', () => refreshTurnoverForm(true));
+    $('turnoverDate').addEventListener('change', changeTurnoverDate);
     $('turnoverCash').addEventListener('input', () => refreshTurnoverForm());
     $('turnoverCard').addEventListener('input', () => refreshTurnoverForm());
     $('entryForm').addEventListener('submit', saveEntry);
