@@ -1,4 +1,4 @@
-/* Aroma — Седмичен отчет v1.4.0. All bookkeeping data stays in this browser. */
+/* Aroma — Седмичен отчет v1.5.0. All bookkeeping data stays in this browser. */
 (() => {
   'use strict';
   const C = window.AromaCore;
@@ -15,6 +15,45 @@
   const formatSigned = p => GBP(p);
   let data, selectedWeek = C.weekStart(C.today()), billMonth = C.monthOf(C.today()), reportMonth = billMonth;
   let activeView = 'week', recordsDateFilter = null, canWrite = true, installPrompt = null, toastTimer = null, lastSavedState = null;
+  // v1.5.0: never overwrite a newer saved version from another open tab/PWA window.
+  let lastSavedRaw = null, storageConflict = false;
+  const editorDialogs = ['turnoverDialog', 'entryDialog', 'billDialog', 'actualDialog'];
+  const editorSnapshots = new Map();
+  function editorSnapshot(id) {
+    return JSON.stringify([...$(id).querySelectorAll('input, select, textarea')]
+      .filter(field => !['button', 'submit', 'file'].includes(field.type))
+      .map(field => [field.id, field.value, field.type === 'checkbox' ? field.checked : null]));
+  }
+  function showEditor(id) {
+    $(id).showModal();
+    editorSnapshots.set(id, editorSnapshot(id));
+  }
+  function hasUnsavedEditor(id) {
+    return $(id).open && editorSnapshots.has(id) && editorSnapshots.get(id) !== editorSnapshot(id);
+  }
+  function dismissEditor(id) {
+    if (hasUnsavedEditor(id) && !window.confirm('Има незаписани промени. Да затворя ли без запис?')) return false;
+    $(id).close();
+    return true;
+  }
+  function storageChanged() {
+    if (storageConflict) return;
+    storageConflict = true;
+    canWrite = false;
+    updateOnline();
+    alertProblem('Записите са променени в друг отворен прозорец на Aroma. За да не изтрия новите данни, запазването тук е спряно. Ако имаш незаписани суми, запиши ги отделно и презареди приложението.');
+  }
+  function storageIsCurrent() {
+    if (!canWrite) return false;
+    try {
+      if (localStorage.getItem(KEY) !== lastSavedRaw) { storageChanged(); return false; }
+      return true;
+    } catch (e) {
+      canWrite = false;
+      alertProblem('Не мога да проверя локалното хранилище. Запазването е спряно: ' + e.message);
+      return false;
+    }
+  }
 
   function alertProblem(message) { window.alert(message); }
   function toast(message) {
@@ -25,9 +64,10 @@
   function load() {
     try {
       const raw = localStorage.getItem(KEY);
-      if (!raw) return C.emptyData();
+      if (raw === null) { lastSavedRaw = null; return C.emptyData(); }
       const restored = JSON.parse(raw);
       if (!C.validState(restored)) throw new Error('Неразпознат формат на съхранените записи');
+      lastSavedRaw = raw;
       return restored;
     } catch (e) {
       canWrite = false;
@@ -37,8 +77,17 @@
   }
   function store() {
     if (!canWrite) { alertProblem('Запазването е блокирано, за да не се презапишат повредени или недостъпни данни.'); return false; }
-    try { localStorage.setItem(KEY, JSON.stringify(data)); lastSavedState = structuredClone(data); return true; }
-    catch (error) { alertProblem('Записът не е успешен. Провери свободното място и настройките за данни в Chrome. Не затваряй страницата, преди да запазиш архив.\n' + error.message); return false; }
+    try {
+      if (!storageIsCurrent()) return false;
+      const serialized = JSON.stringify(data);
+      localStorage.setItem(KEY, serialized);
+      lastSavedRaw = serialized;
+      lastSavedState = structuredClone(data);
+      return true;
+    } catch (error) {
+      alertProblem('Записът не е успешен. Провери свободното място и настройките за данни в Chrome. Не затваряй страницата, преди да запазиш архив.\n' + error.message);
+      return false;
+    }
   }
   function commit(message) {
     // If a write fails, return to the last successfully saved snapshot in memory.
@@ -152,7 +201,7 @@
     $('lastBackup').textContent = data.lastBackupAt ? 'Последен създаден архив: ' + new Intl.DateTimeFormat('bg-BG', { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(data.lastBackupAt)) : 'Все още няма създаден архив.';
   }
   function renderAll() { renderWeek(); renderRecords(); renderBills(); renderReports(); renderMore(); updateOnline(); }
-  function updateOnline() { $('networkIndicator').textContent = navigator.onLine ? 'Само в телефона' : '● Офлайн'; }
+  function updateOnline() { $('networkIndicator').textContent = storageConflict ? '⚠ Презареди' : navigator.onLine ? 'Само в телефона' : '● Офлайн'; }
   function editorDate() { const date = C.today(); return date >= selectedWeek && date <= C.addDays(selectedWeek, 6) ? date : C.addDays(selectedWeek, 1); }
   function turnoverDate() {
     return activeView === 'records' && recordsDateFilter ? recordsDateFilter : editorDate();
@@ -205,7 +254,7 @@
     const date = C.validDate(selectedDate) ? selectedDate : turnoverDate();
     $('turnoverDate').value = date;
     refreshTurnoverForm(true);
-    $('turnoverDialog').showModal();
+    showEditor('turnoverDialog');
   }
   function saveTurnover(event) {
     event.preventDefault();
@@ -253,7 +302,7 @@
         if (bill) $('entryAmount').value = textMoney(C.billAmount(bill, $('entryForMonth').value));
       }
     }
-    $('entryDialog').showModal();
+    showEditor('entryDialog');
   }
   function saveEntry(event) {
     event.preventDefault();
@@ -289,7 +338,7 @@
     $('billTitle').value = bill?.title || '';
     $('billEstimate').value = bill ? textMoney(bill.estimatePence) : '';
     $('billStart').value = bill?.startMonth || billMonth;
-    $('billDialog').showModal();
+    showEditor('billDialog');
   }
   function saveBill(event) {
     event.preventDefault();
@@ -317,7 +366,7 @@
     $('actualMonthLabel').textContent = 'За ' + monthLabel(billMonth);
     $('actualAmount').value = textMoney(C.billAmount(bill, billMonth));
     $('clearActual').disabled = !Object.prototype.hasOwnProperty.call(bill.actuals, billMonth);
-    $('actualDialog').showModal();
+    showEditor('actualDialog');
   }
   function saveActual(event) {
     event.preventDefault();
@@ -364,12 +413,23 @@
   }
   async function backup() {
     try {
+      if (!storageIsCurrent()) return;
       const snapshot = structuredClone(data);
       snapshot.lastBackupAt = new Date().toISOString();
       const checksum = await digest(JSON.stringify(snapshot));
+      // digest is asynchronous: another tab may have saved while we calculated it.
+      if (!storageIsCurrent()) return;
       const file = { format: 'aroma-weekly-backup', version: 1, exportedAt: snapshot.lastBackupAt, checksumSHA256: checksum, payload: snapshot };
       download(`aroma-archive-${C.today()}.json`, JSON.stringify(file, null, 2), 'application/json;charset=utf-8');
-      data.lastBackupAt = snapshot.lastBackupAt; store(); renderMore(); toast('Архивът е създаден. Провери папката Downloads.');
+      const previous = data;
+      data = snapshot;
+      if (!store()) {
+        data = previous;
+        alertProblem('Провери дали JSON файлът е в Downloads. Датата на архива не можа да се запише в приложението.');
+        return;
+      }
+      renderMore();
+      toast('Провери дали JSON архивът е изтеглен в Downloads.');
     } catch (e) { alertProblem('Неуспешен архив: ' + e.message); }
   }
   async function restore(file) {
@@ -412,7 +472,7 @@
     const action = b.dataset.action, id = b.dataset.id, date = b.dataset.date;
     if (action === 'open-turnover') return openTurnover();
     if (action === 'day-turnover' && C.validDate(date)) return openTurnover(date);
-    if (action === 'close-turnover') return $('turnoverDialog').close();
+    if (action === 'close-turnover') return dismissEditor('turnoverDialog');
     if (action === 'add-income') return openEntry('income');
     if (action === 'add-expense') return openEntry('expense');
     if (action === 'day-income' && C.validDate(date)) return openEntry('income', null, '', date);
@@ -433,9 +493,9 @@
     if (action === 'actual-bill') return openActual(id);
     if (action === 'payment-bill') return openEntry('payment', null, id);
     if (['zero-day','closed-day','clear-day'].includes(action)) return dayFlag(action, date);
-    if (action === 'close-entry') $('entryDialog').close();
-    if (action === 'close-bill') $('billDialog').close();
-    if (action === 'close-actual') $('actualDialog').close();
+    if (action === 'close-entry') dismissEditor('entryDialog');
+    if (action === 'close-bill') dismissEditor('billDialog');
+    if (action === 'close-actual') dismissEditor('actualDialog');
   }
   function registerListeners() {
     document.addEventListener('click', actions);
@@ -464,6 +524,18 @@
     $('monthCSV').addEventListener('click', () => exportCSV(true));
     window.addEventListener('online', updateOnline);
     window.addEventListener('offline', updateOnline);
+    // Android back/Escape triggers 'cancel'; deliberate X/Отказ uses dismissEditor.
+    for (const id of editorDialogs) {
+      $(id).addEventListener('cancel', event => { event.preventDefault(); dismissEditor(id); });
+    }
+    window.addEventListener('beforeunload', event => {
+      if (!editorDialogs.some(hasUnsavedEditor)) return;
+      event.preventDefault();
+      event.returnValue = ''; // Browser may show its own generic warning (Android-dependent).
+    });
+    window.addEventListener('storage', event => {
+      if (event.key === KEY && event.newValue !== lastSavedRaw) storageChanged();
+    });
     window.addEventListener('beforeinstallprompt', event => { event.preventDefault(); installPrompt = event; $('installApp').hidden = false; });
     $('installApp').addEventListener('click', async () => { if (!installPrompt) return; installPrompt.prompt(); await installPrompt.userChoice; installPrompt = null; $('installApp').hidden = true; });
   }
