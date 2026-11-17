@@ -55,7 +55,7 @@ assert(app.includes('data-action="day-income"'));
 assert(app.includes('data-action="day-expense"'));
 assert(app.includes('data-action="day-records"'));
 assert(app.includes("const KEY = 'aroma.weekly.v1'"));
-assert(sw.includes("const CACHE = 'aroma-weekly-v1.10.0'"));
+assert(sw.includes("const CACHE = 'aroma-weekly-v1.11.0'"));
 assert(html.includes('id="turnoverDialog"'));
 assert(app.includes('data-action="day-turnover"'));
 assert(html.includes('id="weekTurnover"'));
@@ -136,7 +136,7 @@ const reversed = JSON.stringify(C.cardSettlementSchedule(bank,C.weekDates('2026-
 assert.equal(JSON.stringify(C.cardSettlementSchedule(bank,C.weekDates('2026-11-16'))),reversed,'Deterministic settlement plan');
 assert(html.includes('id="settlementWeek"'));
 assert(html.includes('id="settlementMonth"'));
-assert(html.includes('Aroma — версия 1.10.0'));
+assert(html.includes('Aroma — версия 1.11.0'));
 assert(app.includes('C.cardSettlementDate(day.date)'));
 assert(app.includes('C.cardSettlementSchedule(data, dates)'));
 console.log('✓ v1.3.0 card settlement checks passed: weekday rules, Friday–Sunday Monday merge, cross-week/month, charges and UI wiring.');
@@ -223,35 +223,79 @@ assert(app.includes('price-tie-note'), 'Equal prices explicitly identified');
 assert(app.includes("$('priceSearch').addEventListener('input', renderPriceTool)"));
 const same=[{quantity:12,unit:'pc',totalPence:400},{quantity:18,unit:'pc',totalPence:600},{quantity:24,unit:'pc',totalPence:800}];
 assert(same.every(x=>Math.abs(C.priceRate(x)-C.priceRate(same[0]))<1e-7));
-assert(html.includes('app.js?v=1.10.0'), 'HTML versioned to reduce stale code after update');
+assert(html.includes('app.js?v=1.11.0'), 'HTML versioned to reduce stale code after update');
 console.log('✓ v1.7.0: price search, save confirmation, equal prices and cache-busting links.');
 
-// v1.10.0: optional in-progress offer is independent of real financial records.
+// v1.11.0: optional in-progress offer is independent of real financial records.
 assert(app.includes("const PRICE_DRAFT_KEY = 'aroma.price-draft.v1'"));
 assert(app.includes('function persistPriceDraft()'));
 assert(app.includes('function restorePriceDraft()'));
 assert(app.includes('function clearPriceDraftFromStorage()'));
 assert(html.includes('id="priceDraftInfo"'));
 assert(app.includes('restorePriceDraft(); registerListeners(); renderAll();'));
-console.log('✓ v1.10.0: draft safety and unchanged financial storage key.');
+console.log('✓ v1.11.0: draft safety and unchanged financial storage key.');
 
-// v1.10.0: guard a Z-report date change, keep the backup reminder in More,
+// v1.11.0: guard a Z-report date change, keep the backup reminder in More,
 // and avoid mutating financial data before validation.
 assert(app.includes('function changeTurnoverDate()'));
 assert(app.includes('Има незаписани Cash/Card суми'));
 assert(app.includes("$('turnoverDate').addEventListener('change', changeTurnoverDate)"));
 assert(app.includes('Препоръчително е да направиш нов JSON архив.'));
 assert(app.includes('const candidate = structuredClone(data)'));
-console.log('✓ v1.10.0: safeguards for editing, backup reminder and transactional validation.');
+console.log('✓ v1.11.0: safeguards for editing, backup reminder and transactional validation.');
 
-// v1.10.0: the offline cache must contain the *exact* versioned URLs
+// v1.11.0: the offline cache must contain the *exact* versioned URLs
 // referenced by the HTML, not just the unversioned filenames.
 const serviceWorker = fs.readFileSync(__dirname + '/sw.js', 'utf8');
 for (const resource of ['styles.css','logic.js','app.js']) {
-  assert(html.includes(`./${resource}?v=1.10.0`));
-  assert(serviceWorker.includes(`./${resource}?v=1.10.0`), `Offline cache missing ${resource}`);
+  assert(html.includes(`./${resource}?v=1.11.0`));
+  assert(serviceWorker.includes(`./${resource}?v=1.11.0`), `Offline cache missing ${resource}`);
 }
 assert(serviceWorker.includes("const shouldCache = isPage || CACHEABLE.has(url.href)"), 'Only static assets are cacheable');
 assert(app.includes('включително офертите'), 'Archive restoration must warn that offers are replaced');
 assert(app.includes("navigator.serviceWorker.register('./sw.js', { updateViaCache: 'none' })"));
-console.log('✓ v1.10.0 offline assets and archive overwrite warnings verified.');
+console.log('✓ v1.11.0 offline assets and archive overwrite warnings verified.');
+
+// v1.11.0: purchase allocation changes ONLY weekly daily PRESENTATION.
+// The original records, true dates and month reports must stay unchanged.
+{
+  const local = C.emptyData();
+  local.records.push({id:'monday_purchase',date:'2026-11-16',kind:'expense',category:'purchase',amountPence:46702,note:'Тестова стока'});
+  local.records.push({id:'tuesday_cash',date:'2026-11-17',kind:'income',method:'cash',amountPence:4700,note:''});
+  local.records.push({id:'tuesday_card',date:'2026-11-17',kind:'income',method:'card',amountPence:5550,note:''});
+  local.bills.push({id:'bill_daily',title:'Тестова сметка',startMonth:'2026-11',estimatePence:411000,actuals:{}}); // £137 per day in November
+  const original = JSON.stringify(local);
+  const raw = C.periodSummary(local,C.weekDates('2026-11-16'));
+  const spread = C.weekDisplaySummary(local,'2026-11-17');
+  assert.equal(JSON.stringify(local),original,'Allocation must never change the stored data');
+  assert.equal(spread.purchases,46702);
+  assert.equal(spread.days[0].purchases,0,'Monday has no allocated purchases');
+  assert.deepEqual(spread.days.slice(1).map(d=>d.purchases),[7784,7784,7784,7784,7783,7783]);
+  assert.equal(spread.days.reduce((s,d)=>s+d.purchases,0),46702);
+  assert.equal(spread.days[0].expenses,13700,'Monday has only calendar-day bills, not purchases');
+  assert.equal(spread.days[1].expenses,13700+Math.round(5550*169/10000)+7784);
+  assert.equal(spread.days[2].expenses,13700+7784);
+  assert.equal(spread.expenses,raw.expenses,'No change in weekly total expenses');
+  assert.equal(spread.result,raw.result,'No change in weekly profit');
+  assert.equal(spread.days.reduce((s,d)=>s+d.expenses,0),spread.expenses,'Daily expenses must add to weekly expenses');
+  assert.equal(spread.days.reduce((s,d)=>s+d.result,0),spread.result);
+  assert.equal(C.dateSummary(local,'2026-11-16').purchases,46702,'Original Monday entry remains dated Monday');
+  assert.equal(C.periodSummary(local,C.monthDates('2026-11')).purchases,46702,'Monthly date-based records unchanged');
+  const partial = C.emptyData();
+  partial.records.push({id:'jan_monday',date:'2023-01-30',kind:'expense',category:'purchase',amountPence:103,note:''});
+  partial.records.push({id:'feb_sunday',date:'2023-02-05',kind:'expense',category:'purchase',amountPence:200,note:''});
+  const cross = C.weekDisplaySummary(partial,'2023-01-31');
+  assert.deepEqual(cross.days.map(d=>d.purchases),[0,51,51,51,50,50,50], 'Remainder split across 6 days');
+  assert.equal(C.periodSummary(partial,C.monthDates('2023-01')).purchases,103);
+  assert.equal(C.periodSummary(partial,C.monthDates('2023-02')).purchases,200);
+  assert.equal(cross.days.reduce((s,d)=>s+d.expenses,0),cross.expenses);
+  const negative = C.emptyData();
+  negative.records.push({id:'negative_fix',date:'2026-11-16',kind:'expense',category:'purchase',amountPence:-7,note:''});
+  assert.deepEqual(C.weekDisplaySummary(negative,'2026-11-16').days.map(d=>d.purchases),[0,-2,-1,-1,-1,-1,-1]);
+  const empty = C.weekDisplaySummary(C.emptyData(),'2026-11-16');
+  assert(empty.days.every(d=>d.purchases===0));
+  assert(app.includes('C.weekDisplaySummary(data, selectedWeek)'), 'Weekly screen and weekly reports must use new display');
+  assert(app.includes("monthly ? C.periodSummary(data, dates) : C.weekDisplaySummary(data, selectedWeek)"), 'CSV week/month views distinct');
+  assert(html.includes('В седмичния изглед покупките са разпределени между вторник и неделя.'));
+  console.log('✓ v1.11.0: 22 checks for weekly split, pennies, negatives, cross-month dates, original records and CSV labels.');
+}

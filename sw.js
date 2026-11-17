@@ -1,9 +1,9 @@
-/* Aroma v1.10.0: offline cache matches the exact versioned asset URLs in index.html.
+/* Aroma v1.11.0: offline cache matches the exact versioned asset URLs in index.html.
    Financial records and saved price offers are NEVER in the Service Worker cache. */
-const CACHE = 'aroma-weekly-v1.10.0';
+const CACHE = 'aroma-weekly-v1.11.0';
 const ASSETS = [
   './', './index.html',
-  './styles.css?v=1.10.0', './logic.js?v=1.10.0', './app.js?v=1.10.0',
+  './styles.css?v=1.11.0', './logic.js?v=1.11.0', './app.js?v=1.11.0',
   './manifest.webmanifest', './icon.svg', './icon-192.png', './icon-512.png'
 ];
 const CACHEABLE = new Set(ASSETS.map(path => new URL(path, self.registration.scope).href));

@@ -1,4 +1,4 @@
-/* Aroma — Седмичен отчет v1.8.0: pure date, accounting and price comparison functions. */
+/* Aroma — Седмичен отчет v1.11.0: pure date, accounting and price comparison functions. */
 (function (root, factory) {
   const api = factory();
   if (typeof module === 'object' && module.exports) module.exports = api;
@@ -93,6 +93,28 @@
     const keys = ['cash', 'card', 'otherIncome', 'income', 'purchases', 'otherExpense', 'cardFee', 'monthly', 'expenses', 'payments', 'result'];
     const totals = Object.fromEntries(keys.map(k => [k, days.reduce((sum, d) => sum + d[k], 0)]));
     return { ...totals, days, missing: days.filter(d => d.state === 'missing').length };
+  }
+  // v1.11.0: For the weekly DAY DISPLAY only, share all purchases dated Mon–Sun
+  // across Tue–Sun. Do not move or edit real records. Monthly reports use the
+  // original dates. Whole pennies are assigned deterministically so totals match.
+  function weekDisplaySummary(data, date) {
+    const raw = periodSummary(data, weekDates(date));
+    const absolute = Math.abs(raw.purchases);
+    const unit = Math.floor(absolute / 6);
+    const extra = absolute % 6;
+    const sign = raw.purchases < 0 ? -1 : 1;
+    const days = raw.days.map((day, index) => {
+      const purchases = index === 0 ? 0 : sign * (unit + (index - 1 < extra ? 1 : 0));
+      const expenses = day.expenses - day.purchases + purchases;
+      return {
+        ...day,
+        originalPurchases: day.purchases, // informational: purchases on their real date
+        purchases, // allocated share shown in the WEEK's daily row and weekly CSV
+        expenses,
+        result: day.income - expenses
+      };
+    });
+    return { ...raw, days };
   }
   // Expected incoming bank transfers *by settlement date*. The selected reporting
   // period can contain deposits from sales in a previous week/month. No records
@@ -208,5 +230,5 @@
     if (new Set(data.records.map(r => r.id)).size !== data.records.length || new Set(data.bills.map(b => b.id)).size !== data.bills.length) return false;
     return true;
   }
-  return { validDate, validMonth, today, addDays, dayOfWeek, weekStart, weekDates, monthDates, monthOf, money, parseMoney, billAmount, billDailyShare, dateSummary, periodSummary, cardSettlementDate, cardSettlementSchedule, fingerprint, dailyZId, dailyZRecord, applyDailyTurnover, emptyData, validState, priceMeasure, priceRate, priceGroup, priceKey, validPriceOffer };
+  return { validDate, validMonth, today, addDays, dayOfWeek, weekStart, weekDates, monthDates, monthOf, money, parseMoney, billAmount, billDailyShare, dateSummary, periodSummary, weekDisplaySummary, cardSettlementDate, cardSettlementSchedule, fingerprint, dailyZId, dailyZRecord, applyDailyTurnover, emptyData, validState, priceMeasure, priceRate, priceGroup, priceKey, validPriceOffer };
 });

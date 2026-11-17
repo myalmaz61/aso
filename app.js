@@ -1,4 +1,4 @@
-/* Aroma — Седмичен отчет v1.10.0. All bookkeeping data stays in this browser. */
+/* Aroma — Седмичен отчет v1.11.0. All bookkeeping data stays in this browser. */
 (() => {
   'use strict';
   const C = window.AromaCore;
@@ -121,7 +121,7 @@
     return `<div class="amount-row"><span>${esc(label)}</span><strong class="${cls}">${GBP(amount)}</strong></div>`;
   }
   function renderWeek() {
-    const days = C.weekDates(selectedWeek), s = C.periodSummary(data, days);
+    const s = C.weekDisplaySummary(data, selectedWeek);
     $('weekPeriod').textContent = weekTitle(selectedWeek);
     $('weekIncome').textContent = GBP(s.income);
     $('weekExpenses').textContent = GBP(s.expenses);
@@ -133,20 +133,22 @@
       amountRow('Продажби с карта (Card)', s.card),
       amountRow('Други приходи', s.otherIncome),
       '<div class="rule"></div>',
-      amountRow('Покупки / стока', s.purchases),
+      amountRow('Покупки / стока (общо за седмицата)', s.purchases),
       amountRow('Други дневни разходи', s.otherExpense),
       amountRow('Картови такси (прогноза)', s.cardFee),
       amountRow('Дял от месечните сметки', s.monthly),
       '<div class="rule"></div>',
       amountRow('Отбелязани плащания по сметки (не са втори разход)', s.payments, 'muted-amount')
     ].join('');
+    $('weeklyBreakdown').insertAdjacentHTML('beforeend', '<p class="hint-text">Покупките от понеделник до неделя са разпределени по равно върху шестте дни вторник–неделя. Оригиналната дата на всяка покупка остава в „Записи“ и в месечния отчет.</p>');
     $('weekDays').innerHTML = s.days.map(day => {
       const status = day.state === 'closed' ? 'Затворено' : day.state === 'zero' ? 'Без оборот · £0' : day.state === 'recorded' ? 'Въведено' : 'Няма данни';
       const kind = day.state === 'missing' ? 'missing' : day.state === 'closed' ? 'closed' : 'done';
       const tags = data.days[day.date];
       const date = esc(day.date);
       const note = day.card !== 0 ? `<small>Карта ${GBP(day.card)} · такса ~${GBP(day.cardFee)} · очакван превод ${GBP(day.card - day.cardFee)} на ${shortDate(C.cardSettlementDate(day.date))}</small>` : '';
-      return `<article class="day-row"><div class="day-line"><div><strong>${esc(dayName(day.date))}</strong><small>${shortDate(day.date)} · <span class="status ${kind}">${status}</span></small></div><div class="day-money">${GBP(day.income)}<small>Разходи ${GBP(day.expenses)}</small></div></div>${note}<div class="day-quick-actions"><button type="button" data-action="day-turnover" data-date="${date}">Cash + Card</button><button type="button" data-action="day-income" data-date="${date}">＋ Приход</button><button type="button" data-action="day-expense" data-date="${date}">＋ Разход</button><button type="button" data-action="day-records" data-date="${date}">Записи</button></div><div class="day-actions"><button type="button" data-action="zero-day" data-date="${date}">Без оборот</button><button type="button" data-action="closed-day" data-date="${date}">Затворено</button>${tags ? `<button type="button" data-action="clear-day" data-date="${date}">Изчисти статуса</button>` : ''}</div></article>`;
+      const costDetails = `<small>Дял покупки ${GBP(day.purchases)} · дял сметки ${GBP(day.monthly)}${day.cardFee ? ' · такса карта ' + GBP(day.cardFee) : ''}${day.otherExpense ? ' · други разходи ' + GBP(day.otherExpense) : ''}</small>`;
+      return `<article class="day-row"><div class="day-line"><div><strong>${esc(dayName(day.date))}</strong><small>${shortDate(day.date)} · <span class="status ${kind}">${status}</span></small></div><div class="day-money">${GBP(day.income)}<small>Разходи ${GBP(day.expenses)}</small></div></div>${note}${costDetails}<div class="day-quick-actions"><button type="button" data-action="day-turnover" data-date="${date}">Cash + Card</button><button type="button" data-action="day-income" data-date="${date}">＋ Приход</button><button type="button" data-action="day-expense" data-date="${date}">＋ Разход</button><button type="button" data-action="day-records" data-date="${date}">Записи</button></div><div class="day-actions"><button type="button" data-action="zero-day" data-date="${date}">Без оборот</button><button type="button" data-action="closed-day" data-date="${date}">Затворено</button>${tags ? `<button type="button" data-action="clear-day" data-date="${date}">Изчисти статуса</button>` : ''}</div></article>`;
     }).join('');
     const pastMissing = s.days.filter(d => d.date <= C.today() && d.state === 'missing').length;
     $('weekWarnings').innerHTML = pastMissing ? `<p class="warning-line">◌ ${pastMissing} ${pastMissing === 1 ? 'ден е' : 'дни са'} без отбелязан оборот или затваряне до днес.</p>` : '';
@@ -193,7 +195,7 @@
     return `<div class="settlement-total"><span>Очаквано по банката за периода</span><strong>${GBP(plan.net)}</strong><small>Бруто ${GBP(plan.gross)} − такси ~${GBP(plan.fee)}</small></div>${rows}`;
   }
   function renderReports() {
-    const sw = C.periodSummary(data, C.weekDates(selectedWeek)), sm = C.periodSummary(data, C.monthDates(reportMonth));
+    const sw = C.weekDisplaySummary(data, selectedWeek), sm = C.periodSummary(data, C.monthDates(reportMonth));
     $('reportWeek').innerHTML = reportHTML(sw, weekTitle(selectedWeek));
     $('reportMonthSummary').innerHTML = reportHTML(sm, monthLabel(reportMonth));
     $('settlementWeek').innerHTML = settlementHTML(C.weekDates(selectedWeek));
@@ -717,8 +719,8 @@
   }
   function exportCSV(monthly) {
     const dates = monthly ? C.monthDates(reportMonth) : C.weekDates(selectedWeek);
-    const s = C.periodSummary(data, dates);
-    const header = ['Дата','Статус','Брой','Карта','Друг приход','Всички приходи','Покупки','Други разходи','Такса карта','Месечни разходи (дял)','Всички разходи','Резултат','Платени месечни сметки (информация)'];
+    const s = monthly ? C.periodSummary(data, dates) : C.weekDisplaySummary(data, selectedWeek);
+    const header = ['Дата','Статус','Брой','Карта','Друг приход','Всички приходи', monthly ? 'Покупки (действителна дата)' : 'Покупки (разпределени Вт–Нд)','Други разходи','Такса карта','Месечни разходи (дял)','Всички разходи','Резултат','Платени месечни сметки (информация)'];
     const statusBg = { closed: 'Затворено', zero: 'Без оборот', recorded: 'Въведено', missing: 'Няма данни' };
     const amounts = d => ['cash','card','otherIncome','income','purchases','otherExpense','cardFee','monthly','expenses','result','payments'].map(k => textMoney(d[k]));
     const rows = [header, ...s.days.map(d => [d.date, statusBg[d.state], ...amounts(d)]), ['ОБЩО', '', ...amounts(s)]];
