@@ -1,4 +1,4 @@
-/* Aroma — Седмичен отчет v1.0.0: pure date and accounting functions. */
+/* Aroma — Седмичен отчет v1.2.0: pure date and accounting functions. */
 (function (root, factory) {
   const api = factory();
   if (typeof module === 'object' && module.exports) module.exports = api;
@@ -94,6 +94,39 @@
     const bills = (data.bills || []).map(b => [b.id, ...dates.map(d => billDailyShare(b, d))]).sort((a,b) => String(a[0]).localeCompare(String(b[0])));
     return JSON.stringify({ records, bills, flags: dates.map(d => data.days?.[d] || ''), feeBps: data.settings?.feeBps ?? 169 });
   }
+  // These entries reuse the ordinary v1 income record shape. Re-saving the same
+  // date/method updates the dedicated daily Z record instead of duplicating it.
+  function dailyZId(date, method) {
+    if (!validDate(date) || !['cash', 'card'].includes(method)) throw new Error('Невалидна дата или вид оборот.');
+    return `z_${date.replace(/-/g, '')}_${method}`;
+  }
+  function dailyZRecord(data, date, method) {
+    const id = dailyZId(date, method);
+    const record = data.records.find(r => r.id === id);
+    if (record && (record.date !== date || record.kind !== 'income' || record.method !== method)) {
+      throw new Error('Има несъответствие в дневния Z отчет. Провери записа в „Записи“.');
+    }
+    return record || null;
+  }
+  function applyDailyTurnover(data, date, amounts) {
+    if (!validDate(date) || !amounts || typeof amounts !== 'object') throw new Error('Невалидни данни за дневен оборот.');
+    const records = data.records.slice();
+    let entered = false;
+    for (const method of ['cash', 'card']) {
+      const amountPence = amounts[method];
+      if (amountPence === undefined || amountPence === null) continue; // blank means unchanged
+      if (!Number.isSafeInteger(amountPence) || amountPence < 0 || amountPence > 10000000000) {
+        throw new Error('Въведи положителна или нулева сума за Cash и Card.');
+      }
+      const existing = dailyZRecord(data, date, method);
+      const record = { id: dailyZId(date, method), kind: 'income', date, method, amountPence, note: 'Дневен Z отчет' };
+      if (existing) records[records.indexOf(existing)] = record;
+      else records.push(record);
+      entered = true;
+    }
+    if (!entered) throw new Error('Попълни поне едно поле — Cash или Card.');
+    return { ...data, records };
+  }
   function emptyData() {
     return { schema: 1, records: [], bills: [], days: {}, reviewedWeeks: {}, settings: { feeBps: 169 }, lastBackupAt: null };
   }
@@ -109,5 +142,5 @@
     if (new Set(data.records.map(r => r.id)).size !== data.records.length || new Set(data.bills.map(b => b.id)).size !== data.bills.length) return false;
     return true;
   }
-  return { validDate, validMonth, today, addDays, dayOfWeek, weekStart, weekDates, monthDates, monthOf, money, parseMoney, billAmount, billDailyShare, dateSummary, periodSummary, fingerprint, emptyData, validState };
+  return { validDate, validMonth, today, addDays, dayOfWeek, weekStart, weekDates, monthDates, monthOf, money, parseMoney, billAmount, billDailyShare, dateSummary, periodSummary, fingerprint, dailyZId, dailyZRecord, applyDailyTurnover, emptyData, validState };
 });

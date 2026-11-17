@@ -43,3 +43,48 @@ assert(C.validState(d));
 assert(!C.validState({...d,records:[...d.records,{id:'bad',kind:'income',date:'2023-99-99',amountPence:100,method:'cash',note:''}]}));
 assert(!C.validState({...d,records:[...d.records,{id:'r1',kind:'income',date:'2023-02-01',amountPence:100,method:'cash',note:''}]}));
 console.log('✓ 23 checks passed: dates, cross-month weeks, money, daily status, fee, accrual, payment, review and restore validation.');
+
+// Non-destructive UI contract checks for the optional day shortcuts (v1.2.0).
+const fs = require('node:fs');
+const html = fs.readFileSync(__dirname + '/index.html','utf8');
+const app = fs.readFileSync(__dirname + '/app.js','utf8');
+const sw = fs.readFileSync(__dirname + '/sw.js','utf8');
+assert(html.includes('id="recordsDateFilter"'));
+assert(html.includes('id="clearRecordsDate"'));
+assert(app.includes('data-action="day-income"'));
+assert(app.includes('data-action="day-expense"'));
+assert(app.includes('data-action="day-records"'));
+assert(app.includes("const KEY = 'aroma.weekly.v1'"));
+assert(sw.includes("const CACHE = 'aroma-weekly-v1.2.0'"));
+assert(html.includes('id="turnoverDialog"'));
+assert(app.includes('data-action="day-turnover"'));
+assert(html.includes('id="weekTurnover"'));
+console.log('✓ 10 UI/static checks passed: day actions, Cash/Card form, filter, storage compatibility, cache update.');
+
+// Day turnover tests: upsert, corrections, blank untouched, legacy records preserved.
+const oldData = C.emptyData();
+oldData.records.push({id:'old_cash', kind:'income', date:'2023-01-31', method:'cash', amountPence:3900, note:'стар отделен запис'});
+const baseString = JSON.stringify(oldData);
+let z = C.applyDailyTurnover(oldData, '2023-01-31', {cash:12560, card:20890});
+assert.equal(JSON.stringify(oldData), baseString, 'Do not mutate the old state');
+assert.equal(C.dailyZId('2023-01-31','cash'),'z_20230131_cash');
+assert.equal(C.dailyZRecord(z,'2023-01-31','card').amountPence,20890);
+assert.equal(z.records.length,3,'Manual legacy record is preserved');
+assert.equal(C.dateSummary(z,'2023-01-31').cash,12560+3900);
+const first = z.records.length;
+z = C.applyDailyTurnover(z, '2023-01-31', {cash:11100});
+assert.equal(z.records.length,first,'Correcting same date/method never adds records');
+assert.equal(C.dailyZRecord(z,'2023-01-31','cash').amountPence,11100);
+assert.equal(C.dailyZRecord(z,'2023-01-31','card').amountPence,20890,'Blank card unchanged');
+assert.equal(C.dateSummary(z,'2023-01-31').cardFee, Math.round(20890*0.0169));
+z = C.applyDailyTurnover(z, '2023-01-31', {card:0});
+assert.equal(C.dailyZRecord(z,'2023-01-31','card').amountPence,0);
+assert.equal(z.records.filter(x => x.id === 'old_cash').length,1);
+assert(C.validState(z));
+assert.throws(()=>C.applyDailyTurnover(z,'2023-01-31',{}));
+assert.throws(()=>C.applyDailyTurnover(z,'2023-01-31',{cash:-1}));
+assert.throws(()=>C.dailyZId('2023-01-31','other'));
+const bad = structuredClone(z);
+bad.records.find(x=>x.id==='z_20230131_cash').date='2023-02-01';
+assert.throws(()=>C.applyDailyTurnover(bad,'2023-01-31',{cash:400}));
+console.log('✓ 15 daily Z tests passed: legacy safety, upsert, correction, zero, validation, no duplicate.');

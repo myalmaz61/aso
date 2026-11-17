@@ -78,6 +78,8 @@ h2 { margin: 0; }
 .status { color: #54846b; }
 .status.missing { color: #ac7d35; }
 .status.closed { color: #7e8580; }
+.day-quick-actions { display: flex; flex-wrap: wrap; gap: 7px; margin-top: 12px; }
+.day-quick-actions button { color: var(--primary); background: #e7f0e9; border: 1px solid #cfdfd4; border-radius: 9px; font-size: 12px; font-weight: 700; padding: 9px 11px; min-height: 36px; }
 .day-actions { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
 .day-actions button, .record-actions button, .bill-actions button { background: #f0f4ef; border: 0; color: #3d6555; border-radius: 8px; font-size: 11px; font-weight: 650; padding: 7px 9px; }
 .review-panel { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; padding: 19px 3px 4px; }
@@ -86,6 +88,8 @@ h2 { margin: 0; }
 .warning-line { margin: 4px 0 12px; font-size: 12px; line-height: 1.5; color: #99692f; background: #f7eddd; border-radius: 9px; padding: 12px; }
 .muted { color: var(--muted); font-size: 13px; line-height: 1.65; margin: -4px 2px 15px; }
 .record-list, .bill-list { display: grid; gap: 10px; }
+.date-filter { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin: 0 0 13px; padding: 10px 12px; border: 1px solid #cadcd1; border-radius: 11px; background: #eaf2eb; color: var(--primary); font-size: 12px; font-weight: 700; }
+.date-filter button { flex-shrink: 0; padding: 7px 9px; border: 1px solid #cadcd1; border-radius: 8px; background: #fff; color: var(--primary); font-size: 11px; font-weight: 700; }
 .record, .bill-card, .settings-card, .report-card { background: white; border: 1px solid var(--border); border-radius: 15px; padding: 16px; box-shadow: var(--shadow); }
 .record-main, .bill-card-top { display: flex; gap: 12px; align-items: flex-start; justify-content: space-between; }
 .record-main strong, .bill-card-top strong { display: block; font-size: 13px; }
@@ -148,3 +152,17 @@ h2 { margin: 0; }
 @media (min-width: 650px) { .content { padding-top: 22px; } .section-intro { margin-top: 16px; } .topbar { padding-left: 19px; padding-right: 19px; } .modal form { padding: 27px; } }
 @media (max-width: 340px) { .content { padding-inline: 13px; } .topbar { padding-inline: 12px; } .period-title { font-size: 12px; } .mini-stat { padding: 15px 12px; } .result-card { padding: 20px 15px; } .result-symbol { display: none; } .nav-item { font-size: 9px; } }
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { scroll-behavior: auto !important; transition: none !important; } }
+
+/* v1.2.0 — quick daily Cash + Card entry without cluttering the main dashboard */
+.turnover-shortcut { display: flex; align-items: center; justify-content: space-between; width: 100%; min-height: 39px; margin: -9px 0 14px; padding: 7px 10px; color: var(--primary); background: transparent; border: 0; border-radius: 10px; font-size: 12px; font-weight: 750; text-align: left; }
+.turnover-shortcut span { font-size: 23px; line-height: 1; }
+.turnover-shortcut:active { background: #edf4ef; }
+.records-turnover { margin: -7px 0 14px; background: #eaf2eb; padding: 10px 13px; }
+.turnover-grid { display: grid; grid-template-columns: minmax(0,1fr) minmax(0,1fr); gap: 11px; }
+.turnover-grid .form-field input { min-width: 0; }
+.turnover-existing { font-size: 12px; line-height: 1.65; border-radius: 10px; background: #f2f3ed; color: #526058; padding: 12px 14px; margin: 13px 0; }
+.turnover-existing strong, .turnover-preview strong { display: block; font-size: 12px; margin-bottom: 4px; }
+.turnover-existing.warning { background: #fff5e4; color: #795d28; }
+.turnover-preview { font-size: 12px; line-height: 1.65; border: 1px solid #d6e5d9; border-radius: 10px; background: #ebf3ec; color: var(--primary); padding: 12px 14px; margin: 12px 0; }
+.turnover-preview.error { background: #fff2f0; color: var(--danger); border-color: #ead0cc; }
+@media (max-width: 350px) { .turnover-grid { grid-template-columns: 1fr; gap: 0; } }

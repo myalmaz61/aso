@@ -1,4 +1,4 @@
-/* Aroma — Седмичен отчет v1.0.0. All bookkeeping data stays in this browser. */
+/* Aroma — Седмичен отчет v1.2.0. All bookkeeping data stays in this browser. */
 (() => {
   'use strict';
   const C = window.AromaCore;
@@ -14,7 +14,7 @@
   const textMoney = p => (p / 100).toFixed(2);
   const formatSigned = p => GBP(p);
   let data, selectedWeek = C.weekStart(C.today()), billMonth = C.monthOf(C.today()), reportMonth = billMonth;
-  let activeView = 'week', canWrite = true, installPrompt = null, toastTimer = null;
+  let activeView = 'week', recordsDateFilter = null, canWrite = true, installPrompt = null, toastTimer = null, lastSavedState = null;
 
   function alertProblem(message) { window.alert(message); }
   function toast(message) {
@@ -37,12 +37,22 @@
   }
   function store() {
     if (!canWrite) { alertProblem('Запазването е блокирано, за да не се презапишат повредени или недостъпни данни.'); return false; }
-    try { localStorage.setItem(KEY, JSON.stringify(data)); return true; }
+    try { localStorage.setItem(KEY, JSON.stringify(data)); lastSavedState = structuredClone(data); return true; }
     catch (error) { alertProblem('Записът не е успешен. Провери свободното място и настройките за данни в Chrome. Не затваряй страницата, преди да запазиш архив.\n' + error.message); return false; }
   }
-  function commit(message) { if (store()) { renderAll(); if (message) toast(message); return true; } return false; }
+  function commit(message) {
+    // If a write fails, return to the last successfully saved snapshot in memory.
+    if (!C.validState(data)) {
+      if (lastSavedState) data = structuredClone(lastSavedState);
+      alertProblem('Данните не преминават проверката. Промяната не е запазена.');
+      renderAll(); return false;
+    }
+    if (store()) { renderAll(); if (message) toast(message); return true; }
+    if (lastSavedState) data = structuredClone(lastSavedState);
+    renderAll(); return false;
+  }
   function weekTitle(date) { const ds = C.weekDates(date); return `${shortDate(ds[0])} – ${dateLabel(ds[6])}`; }
-  function jumpWeek(n) { selectedWeek = C.addDays(selectedWeek, n * 7); renderAll(); }
+  function jumpWeek(n) { selectedWeek = C.addDays(selectedWeek, n * 7); recordsDateFilter = null; renderAll(); }
   function changeView(next) {
     if (!['week','records','bills','reports','more'].includes(next)) return;
     activeView = next;
@@ -83,7 +93,7 @@
       const tags = data.days[day.date];
       const date = esc(day.date);
       const note = day.card !== 0 ? `<small>Карта ${GBP(day.card)} · такса ~${GBP(day.cardFee)} · очаквано постъпление ${GBP(day.card - day.cardFee)} на ${shortDate(C.addDays(day.date, 1))}</small>` : '';
-      return `<article class="day-row"><div class="day-line"><div><strong>${esc(dayName(day.date))}</strong><small>${shortDate(day.date)} · <span class="status ${kind}">${status}</span></small></div><div class="day-money">${GBP(day.income)}<small>Разходи ${GBP(day.expenses)}</small></div></div>${note}<div class="day-actions"><button type="button" data-action="zero-day" data-date="${date}">Без оборот</button><button type="button" data-action="closed-day" data-date="${date}">Затворено</button>${tags ? `<button type="button" data-action="clear-day" data-date="${date}">Изчисти статуса</button>` : ''}</div></article>`;
+      return `<article class="day-row"><div class="day-line"><div><strong>${esc(dayName(day.date))}</strong><small>${shortDate(day.date)} · <span class="status ${kind}">${status}</span></small></div><div class="day-money">${GBP(day.income)}<small>Разходи ${GBP(day.expenses)}</small></div></div>${note}<div class="day-quick-actions"><button type="button" data-action="day-turnover" data-date="${date}">Cash + Card</button><button type="button" data-action="day-income" data-date="${date}">＋ Приход</button><button type="button" data-action="day-expense" data-date="${date}">＋ Разход</button><button type="button" data-action="day-records" data-date="${date}">Записи</button></div><div class="day-actions"><button type="button" data-action="zero-day" data-date="${date}">Без оборот</button><button type="button" data-action="closed-day" data-date="${date}">Затворено</button>${tags ? `<button type="button" data-action="clear-day" data-date="${date}">Изчисти статуса</button>` : ''}</div></article>`;
     }).join('');
     const pastMissing = s.days.filter(d => d.date <= C.today() && d.state === 'missing').length;
     $('weekWarnings').innerHTML = pastMissing ? `<p class="warning-line">◌ ${pastMissing} ${pastMissing === 1 ? 'ден е' : 'дни са'} без отбелязан оборот или затваряне до днес.</p>` : '';
@@ -100,8 +110,11 @@
   function renderRecords() {
     $('recordsWeekLabel').textContent = weekTitle(selectedWeek);
     const end = C.addDays(selectedWeek, 6);
-    const records = data.records.filter(r => r.date >= selectedWeek && r.date <= end).sort((a,b) => b.date.localeCompare(a.date) || b.id.localeCompare(a.id));
-    $('recordsList').innerHTML = records.length ? records.map(r => `<article class="record"><div class="record-main"><div><strong>${esc(recordTitle(r))}</strong><small>${dateLabel(r.date)}${r.note ? ' · ' + esc(r.note) : ''}</small></div><span class="record-amount ${r.kind === 'income' ? 'income-text' : ''}">${r.kind === 'payment' ? '↗ ' : ((r.kind === 'income' ? r.amountPence : -r.amountPence) < 0 ? '−' : '+')}${GBP(Math.abs(r.amountPence))}${r.amountPence < 0 ? ' (корекция)' : ''}</span></div><div class="record-actions"><button data-action="edit-record" data-id="${esc(r.id)}" type="button">Редактирай</button><button class="danger-text" data-action="delete-record" data-id="${esc(r.id)}" type="button">Изтрий</button></div></article>`).join('') : '<div class="empty-state">Няма записи за тази седмица. Използвай „＋ Приход“ или „＋ Разход“.</div>';
+    if (recordsDateFilter && (recordsDateFilter < selectedWeek || recordsDateFilter > end)) recordsDateFilter = null;
+    $('recordsDateFilter').hidden = !recordsDateFilter;
+    $('recordsDateLabel').textContent = recordsDateFilter ? 'Записи за ' + dateLabel(recordsDateFilter) : '';
+    const records = data.records.filter(r => r.date >= selectedWeek && r.date <= end && (!recordsDateFilter || r.date === recordsDateFilter)).sort((a,b) => b.date.localeCompare(a.date) || b.id.localeCompare(a.id));
+    $('recordsList').innerHTML = records.length ? records.map(r => `<article class="record"><div class="record-main"><div><strong>${esc(recordTitle(r))}</strong><small>${dateLabel(r.date)}${r.note ? ' · ' + esc(r.note) : ''}</small></div><span class="record-amount ${r.kind === 'income' ? 'income-text' : ''}">${r.kind === 'payment' ? '↗ ' : ((r.kind === 'income' ? r.amountPence : -r.amountPence) < 0 ? '−' : '+')}${GBP(Math.abs(r.amountPence))}${r.amountPence < 0 ? ' (корекция)' : ''}</span></div><div class="record-actions"><button data-action="edit-record" data-id="${esc(r.id)}" type="button">Редактирай</button><button class="danger-text" data-action="delete-record" data-id="${esc(r.id)}" type="button">Изтрий</button></div></article>`).join('') : `<div class="empty-state">${recordsDateFilter ? 'Няма записи за този ден.' : 'Няма записи за тази седмица.'} Използвай „＋ Приход“ или „＋ Разход“.</div>`;
   }
   function renderBills() {
     $('billMonth').value = billMonth;
@@ -130,13 +143,88 @@
   function renderAll() { renderWeek(); renderRecords(); renderBills(); renderReports(); renderMore(); updateOnline(); }
   function updateOnline() { $('networkIndicator').textContent = navigator.onLine ? 'Само в телефона' : '● Офлайн'; }
   function editorDate() { const date = C.today(); return date >= selectedWeek && date <= C.addDays(selectedWeek, 6) ? date : C.addDays(selectedWeek, 1); }
-  function openEntry(kind, record = null, billId = '') {
+  function turnoverDate() {
+    return activeView === 'records' && recordsDateFilter ? recordsDateFilter : editorDate();
+  }
+  function refreshTurnoverForm(resetValues = false) {
+    const date = $('turnoverDate').value;
+    if (!C.validDate(date)) {
+      $('turnoverExisting').textContent = 'Избери валидна дата.';
+      $('turnoverPreview').textContent = '';
+      return;
+    }
+    try {
+      const cashRecord = C.dailyZRecord(data, date, 'cash');
+      const cardRecord = C.dailyZRecord(data, date, 'card');
+      if (resetValues) {
+        $('turnoverCash').value = cashRecord ? textMoney(cashRecord.amountPence) : '';
+        $('turnoverCard').value = cardRecord ? textMoney(cardRecord.amountPence) : '';
+      }
+      const outside = data.records.filter(r => r.date === date && r.kind === 'income' && (r.method === 'cash' || r.method === 'card') && r.id !== C.dailyZId(date, r.method));
+      const outsideCash = outside.filter(r => r.method === 'cash').reduce((s,r) => s+r.amountPence,0);
+      const outsideCard = outside.filter(r => r.method === 'card').reduce((s,r) => s+r.amountPence,0);
+      $('turnoverExisting').classList.toggle('warning', outside.length > 0);
+      $('turnoverExisting').innerHTML = outside.length
+        ? `<strong>Внимание: има и други продажби за този ден</strong>${outside.length} отделни записа (Cash ${GBP(outsideCash)}, Card ${GBP(outsideCard)}). Те няма да бъдат променени. Ако съдържат същите суми като Z отчета, първо ги провери в „Записи“, за да няма двойно отчитане.`
+        : '<strong>Без други Cash/Card записи</strong>Този формуляр пази по един дневен Z запис за Cash и Card.';
+      const amounts = {};
+      let any = false;
+      for (const method of ['cash', 'card']) {
+        const raw = $(method === 'cash' ? 'turnoverCash' : 'turnoverCard').value.trim();
+        if (!raw) continue;
+        amounts[method] = C.parseMoney(raw);
+        any = true;
+      }
+      if (!any) {
+        $('turnoverPreview').classList.remove('error');
+        $('turnoverPreview').textContent = 'Въведи поне една сума, за да видиш дневния сбор.';
+        return;
+      }
+      const candidate = C.applyDailyTurnover(data, date, amounts);
+      const s = C.dateSummary(candidate, date);
+      $('turnoverPreview').classList.remove('error');
+      $('turnoverPreview').innerHTML = `<strong>Дневен сбор след записване</strong>Cash: ${GBP(s.cash)} · Card: ${GBP(s.card)}<br>Картова такса (прогноза): ${GBP(s.cardFee)}`;
+    } catch (error) {
+      $('turnoverPreview').classList.add('error');
+      $('turnoverPreview').textContent = error.message;
+    }
+  }
+  function openTurnover(selectedDate = '') {
+    const date = C.validDate(selectedDate) ? selectedDate : turnoverDate();
+    $('turnoverDate').value = date;
+    refreshTurnoverForm(true);
+    $('turnoverDialog').showModal();
+  }
+  function saveTurnover(event) {
+    event.preventDefault();
+    try {
+      const date = $('turnoverDate').value;
+      if (!C.validDate(date)) throw new Error('Избери валидна дата.');
+      const amounts = {}, methods = [];
+      for (const method of ['cash', 'card']) {
+        const raw = $(method === 'cash' ? 'turnoverCash' : 'turnoverCard').value.trim();
+        if (!raw) continue;
+        amounts[method] = C.parseMoney(raw);
+        methods.push(method);
+      }
+      if (!methods.length) throw new Error('Попълни Cash, Card или и двете.');
+      // Existing separate records may represent the same sales as the Z report;
+      // never silently replace or double-count them without a clear warning.
+      const otherRecords = data.records.filter(r => r.date === date && r.kind === 'income' && methods.includes(r.method) && r.id !== C.dailyZId(date, r.method));
+      if (otherRecords.length && !confirm(`Внимание: за ${dateLabel(date)} вече има ${otherRecords.length} отделни Cash/Card записа.\n\nНовият Z отчет ще бъде ДОБАВЕН към тях при пресмятането. Ако сумите са за същите продажби, натисни „Отказ“ и първо редактирай старите записи.\n\nСигурен ли си, че продажбите са различни?`)) return;
+      const candidate = C.applyDailyTurnover(data, date, amounts);
+      if (!C.validState(candidate)) throw new Error('Данните не преминаха проверката за валидност.');
+      data = candidate;
+      if (commit('Дневният оборот е запазен.')) $('turnoverDialog').close();
+    } catch (error) { alertProblem(error.message); }
+  }
+  function openEntry(kind, record = null, billId = '', selectedDate = '') {
     const isPayment = kind === 'payment';
     if (isPayment && data.bills.length === 0) return toast('Добави първо месечна сметка.');
     $('entryId').value = record?.id || '';
     $('entryKind').value = kind;
     $('entryHeading').textContent = record ? 'Редактиране на запис' : kind === 'income' ? 'Добави приход' : kind === 'expense' ? 'Добави разход' : 'Отбележи плащане';
-    $('entryDate').value = record?.date || (isPayment ? C.today() : editorDate());
+    $('entryDate').value = record?.date || (C.validDate(selectedDate) ? selectedDate : isPayment ? C.today() : recordsDateFilter && activeView === 'records' ? recordsDateFilter : editorDate());
     $('entryAmount').value = record ? textMoney(record.amountPence) : '';
     $('entryMethod').value = record?.method || 'cash';
     $('entryCategory').value = record?.category || 'purchase';
@@ -305,13 +393,28 @@
     toast('CSV отчетът е изтеглен.');
   }
   function actions(event) {
-    const view = event.target.closest('[data-view]'); if (view) return changeView(view.dataset.view);
+    const view = event.target.closest('[data-view]');
+    if (view) { if (view.dataset.view === 'records') recordsDateFilter = null; return changeView(view.dataset.view); }
     const suggestion = event.target.closest('[data-suggest]'); if (suggestion) { $('billTitle').value = suggestion.dataset.suggest; return; }
     const b = event.target.closest('[data-action]'); if (!b) return;
     const action = b.dataset.action, id = b.dataset.id, date = b.dataset.date;
+    if (action === 'open-turnover') return openTurnover();
+    if (action === 'day-turnover' && C.validDate(date)) return openTurnover(date);
+    if (action === 'close-turnover') return $('turnoverDialog').close();
     if (action === 'add-income') return openEntry('income');
     if (action === 'add-expense') return openEntry('expense');
-    if (action === 'edit-record') { const record = data.records.find(r => r.id === id); if (record) openEntry(record.kind, record); return; }
+    if (action === 'day-income' && C.validDate(date)) return openEntry('income', null, '', date);
+    if (action === 'day-expense' && C.validDate(date)) return openEntry('expense', null, '', date);
+    if (action === 'day-records' && C.validDate(date)) {
+      recordsDateFilter = date;
+      return changeView('records');
+    }
+    if (action === 'edit-record') {
+      const record = data.records.find(r => r.id === id);
+      if (record && record.kind === 'income' && ['cash', 'card'].includes(record.method) && record.id === C.dailyZId(record.date, record.method)) return openTurnover(record.date);
+      if (record) openEntry(record.kind, record);
+      return;
+    }
     if (action === 'delete-record') return deleteRecord(id);
     if (action === 'edit-bill') return openBill(data.bills.find(b => b.id === id));
     if (action === 'delete-bill') return deleteBill(id);
@@ -328,8 +431,13 @@
     $('nextWeek').addEventListener('click', () => jumpWeek(1));
     $('recordsPrev').addEventListener('click', () => jumpWeek(-1));
     $('recordsNext').addEventListener('click', () => jumpWeek(1));
-    $('goToday').addEventListener('click', () => { selectedWeek = C.weekStart(C.today()); renderAll(); });
+    $('goToday').addEventListener('click', () => { selectedWeek = C.weekStart(C.today()); recordsDateFilter = null; renderAll(); });
     $('reviewToggle').addEventListener('click', toggleReview);
+    $('clearRecordsDate').addEventListener('click', () => { recordsDateFilter = null; renderRecords(); });
+    $('turnoverForm').addEventListener('submit', saveTurnover);
+    $('turnoverDate').addEventListener('change', () => refreshTurnoverForm(true));
+    $('turnoverCash').addEventListener('input', () => refreshTurnoverForm());
+    $('turnoverCard').addEventListener('input', () => refreshTurnoverForm());
     $('entryForm').addEventListener('submit', saveEntry);
     $('billForm').addEventListener('submit', saveBill);
     $('actualForm').addEventListener('submit', saveActual);
@@ -347,6 +455,6 @@
     window.addEventListener('beforeinstallprompt', event => { event.preventDefault(); installPrompt = event; $('installApp').hidden = false; });
     $('installApp').addEventListener('click', async () => { if (!installPrompt) return; installPrompt.prompt(); await installPrompt.userChoice; installPrompt = null; $('installApp').hidden = true; });
   }
-  data = load(); registerListeners(); renderAll();
+  data = load(); lastSavedState = structuredClone(data); registerListeners(); renderAll();
   if ('serviceWorker' in navigator) navigator.serviceWorker.register('./sw.js').catch(error => console.warn('Service worker:', error));
 })();
